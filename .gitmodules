@@ -1,0 +1,3 @@
+[submodule "PoC/sferes2"]
+	path = PoC/sferes2
+	url = https://github.com/sferes2/sferes2.git
