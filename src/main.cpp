@@ -27,8 +27,14 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Test the data
-    qdt::testGreedyHeuristic(data, args);
+    // Create the tests
+    std::vector<qdt::DataSet> data_sets = qdt::createDataSets(data, args);
+
+    // Test greedy single tree
+    qdt::testGreedyHeuristic(data_sets, args);
+
+    // Test bagging greedy ensemble 
+    qdt::testBagging(data_sets, args);
     //qdt::testEP
     //qdt::testQD
 }

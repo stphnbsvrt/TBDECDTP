@@ -48,6 +48,25 @@ struct DataElem {
 };
 
 ///
+/// \brief A set of training/testing data set pairs to use for testing
+///
+
+struct DataSet {
+
+    ///
+    /// \brief Training data for the set
+    ///
+
+    std::vector<const DataElem*> training_data;
+
+    ///
+    /// \brief Testing data for the set
+    ///
+
+    std::vector<const DataElem*> testing_data;
+};
+
+///
 /// \brief Represents a decision for a node to consider for determining branch routing
 ///
 
@@ -96,6 +115,12 @@ struct DecisionTreeNode {
     float label;
 
     ///
+    /// \brief The confidence of each label for this node
+    ///
+
+    std::unordered_map<float, float> confidences;
+
+    ///
     /// \brief Pointer to the parent of this node - nullptr if it is a root
     ///
 
@@ -140,7 +165,7 @@ public:
     /// \brief Generate a tree from data elements using a greedy heuristic strategy
     ///
 
-    static std::shared_ptr<DecisionTree> greedyTrain(const std::vector<DataElem>& training_data);
+    static std::shared_ptr<DecisionTree> greedyTrain(const std::vector<const DataElem*>& training_data);
 
     ///
     /// \brief Test the accuracy of the tree on a set of data
@@ -149,7 +174,16 @@ public:
     /// \return Percent accuracy of the predictions over the data set
     ///
 
-    float testAccuracy(const std::vector<DataElem>& testing_data, bool verbose);
+    float testAccuracy(const std::vector<const DataElem*>& testing_data, bool verbose);
+
+    ///
+    /// \brief Test the accuracy of an ensemble of trees on a set of data
+    /// Verbose option for logging mispredictions
+    ///
+    /// \return Percent accuracy of the predictions over the data set
+    ///
+
+    static float testEnsembleAccuracy(const std::vector<std::shared_ptr<DecisionTree>>& ensemble, const std::vector<const DataElem*>& testing_data, bool verbose);
 
     ///
     /// \brief Predict a label for a set of features using the decision tree
@@ -157,13 +191,19 @@ public:
 
     float predict(const std::unordered_map<std::string, float> features);
 
+    ///
+    /// \brief Predict with confidence for a set of features using the decision tree
+    ///
+
+    std::unordered_map<float, float> predictConfidence(const std::unordered_map<std::string, float> features);
+
 protected:
 
     ///
     /// \brief Used to recursively apply greedy decision tree node generation
     ///
 
-    static std::shared_ptr<DecisionTreeNode> greedyTrain(const std::vector<DataElem>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number);
+    static std::shared_ptr<DecisionTreeNode> greedyTrain(const std::vector<const DataElem*>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number);
 
     ///
     /// \brief Default constructor

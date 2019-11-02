@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.0.0)
 project(QDTree)
 
 find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(JSONCPP jsoncpp)
+include_directories("${JSONCPP_INCLUDE_DIRS}")
 
 include_directories(src)
 set(SOURCES src/main.cpp src/qdtree-input.cpp src/qdtree-tests.cpp src/qdtree-const.cpp)

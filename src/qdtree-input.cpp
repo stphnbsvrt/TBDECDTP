@@ -11,13 +11,14 @@ po::variables_map parseCommandline(int argc, char** argv) {
         ("help", "print options info")
         ("json_input", po::value<std::string>(), "json data to input")
         ("dump_data", "Dump the data elements after reading them into the app")
+        ("forest_size", po::value<uint32_t>(), "Number of trees to use in the ensemble predictors")
     ;
 
     po::variables_map vm;
     try {
         po::store(po::parse_command_line(argc, argv, desc), vm);
     }
-    catch(boost::wrapexcept<po::unknown_option>& e) {
+    catch(std::exception& e) {
         std::cout << e.what() << std::endl;
         std::cout << desc << std::endl;
         exit(1);
@@ -65,4 +66,24 @@ std::vector<DataElem> parseJson(std::string json_file) {
     }
     return data_vec;
 }
+
+std::vector<DataSet> createDataSets(const std::vector<DataElem>& data, po::variables_map args) {
+
+    // FIXME: args options - 10 fold cross validation
+    (void)args;
+    int training_chance = 66;
+    std::vector<DataSet> ret_sets;
+    DataSet set;
+    for (auto& elem : data) {
+        if ((rand() % 100) < training_chance) {
+            set.training_data.push_back(&elem);
+        }
+        else {
+            set.testing_data.push_back(&elem);
+        }
+    }
+    ret_sets.push_back(set);
+    return ret_sets;
+}
+
 }

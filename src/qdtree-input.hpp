@@ -24,6 +24,23 @@ po::variables_map parseCommandline(int argc, char** argv);
 
 std::vector<DataElem> parseJson(std::string json_file);
 
+///
+/// \brief Create data sets to use for testing
+///
+/// \param[in] data The data to use for data set creation
+/// \param[in] args Commandline args to use for test creation
+///
+/// \return A list of training/testing data pairs to compare between algorithms
+///
+
+std::vector<DataSet> createDataSets(const std::vector<DataElem>& data, po::variables_map args);
+
+///
+/// \brief Default number of trees to use in an ensemble
+///
+
+constexpr uint32_t DEFAULT_FOREST_SIZE = 5;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__
