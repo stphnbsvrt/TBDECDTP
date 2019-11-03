@@ -28,13 +28,21 @@ int main(int argc, char** argv) {
     }
 
     // Create the tests
+    srand(time(NULL));
     std::vector<qdt::DataSet> data_sets = qdt::createDataSets(data, args);
 
     // Test greedy single tree
     qdt::testGreedyHeuristic(data_sets, args);
 
     // Test bagging greedy ensemble 
-    qdt::testBagging(data_sets, args);
+    qdt::testBaggingEnsemble(data_sets, args);
+
+    // Test complete random tree
+    qdt::testCompleteRandomSingle(data_sets, args);
+
+    // Test complete random ensemble
+    qdt::testCompleteRandomEnsemble(data_sets, args);
+
     //qdt::testEP
     //qdt::testQD
 }

@@ -153,6 +153,73 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<co
     return tree_node;
 }
 
+std::shared_ptr<DecisionTreeNode> DecisionTree::generateRandomTree(uint32_t height, const std::vector<std::string>& features, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number) {
+
+    // Make a new decision tree node
+    auto tree_node = std::make_shared<DecisionTreeNode>();
+    tree_node->node_number = node_number;
+    tree_node->parent = parent;
+
+    // Create decision and subtree for non-leaves
+    if (1 <= height) {
+        tree_node->decision = std::make_shared<Decision>();
+        tree_node->decision->feature = features[rand() % features.size()];
+        tree_node->decision->threshold = 0.01 * (rand() % 100);
+
+        // Fill child nodes
+        tree_node->l_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 1);
+        tree_node->r_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 2);   
+    }
+    return tree_node;
+
+}
+
+void DecisionTree::fillLabels(const std::vector<const DataElem*>& training_data) {
+    fillLabels(root_, training_data);
+}
+
+void DecisionTree::fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data) {
+
+    // label
+    tree_node->label = calculateLabelForData(training_data);
+    tree_node->confidences = calculateConfidencesForData(training_data);
+
+    // Split data for non-leaf nodes
+    if (nullptr != tree_node->decision) {
+        std::vector<const DataElem*> left_group;
+        std::vector<const DataElem*> right_group;
+        for (auto elem : training_data) {
+            if (elem->features.at(tree_node->decision->feature) < tree_node->decision->threshold) {
+                left_group.push_back(elem);
+            }
+            else {
+                right_group.push_back(elem);
+            }
+        }   
+
+        // Recurse
+        fillLabels(tree_node->l_child, left_group);
+        fillLabels(tree_node->r_child, right_group);
+    }
+}
+
+std::shared_ptr<DecisionTree> DecisionTree::randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height) {
+    std::shared_ptr<DecisionTree> tree(new DecisionTree);
+
+    // Find feature labels
+    std::vector<std::string> features;
+    for (auto feature : training_data[0]->features) {
+        features.push_back(feature.first);
+    }
+
+    // Randomly generate the tree
+    tree->root_ = generateRandomTree(height, features, nullptr, 0);
+
+    // Label the nodes according to data
+    tree->fillLabels(training_data);
+    return tree;
+}
+
 float DecisionTree::testAccuracy(const std::vector<const DataElem*>& testing_data, bool verbose) {
 
     uint64_t num_correct = 0;

@@ -168,6 +168,12 @@ public:
     static std::shared_ptr<DecisionTree> greedyTrain(const std::vector<const DataElem*>& training_data);
 
     ///
+    /// \brief Generate a tree randomly and create predictions based on the input data
+    ///
+
+    static std::shared_ptr<DecisionTree> randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height);
+
+    ///
     /// \brief Test the accuracy of the tree on a set of data
     /// Verbose option for logging mispredictions
     ///
@@ -205,6 +211,24 @@ protected:
 
     static std::shared_ptr<DecisionTreeNode> greedyTrain(const std::vector<const DataElem*>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number);
 
+    ///
+    /// \brief Generates a complete binary tree of a given height using random decisions at each node
+    ///
+
+    static std::shared_ptr<DecisionTreeNode> generateRandomTree(uint32_t height, const std::vector<std::string>& features, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number);
+
+    ///
+    /// \brief Fill the labels of the nodes in the tree according to the given data
+    ///
+
+    void fillLabels(const std::vector<const DataElem*>& training_data);
+
+    ///
+    /// \brief Recursively fill labels of decision tree nodes according to the given data
+    ///
+
+    static void fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data);
+    
     ///
     /// \brief Default constructor
     ///

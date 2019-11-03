@@ -19,7 +19,19 @@ void testGreedyHeuristic(const std::vector<DataSet>& data, po::variables_map arg
 /// \brief Test the accuracy of the bagging-constructed forest with provided args on the data
 ///
 
-void testBagging(const std::vector<DataSet>& data, po::variables_map args);
+void testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args);
+
+///
+/// \brief Test the accuracy of a single complete-random tree with provided args on the data
+///
+
+void testCompleteRandomSingle(const std::vector<DataSet>& data, po::variables_map args);
+
+///
+/// \brief Test the accuracy of an ensemble of complete-random trees with provided args on the data
+///
+
+void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args);
 
 }
 
