@@ -43,6 +43,11 @@ int main(int argc, char** argv) {
     // Test complete random ensemble
     qdt::testCompleteRandomEnsemble(data_sets, args);
 
-    //qdt::testEP
+    // Test genetic programming tree
+    qdt::testGeneticSingle(data_sets, args);
+
+    // Test genetic programming ensemble
+    qdt::testGeneticEnsemble(data_sets, args);
+    
     //qdt::testQD
 }

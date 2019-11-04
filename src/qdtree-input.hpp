@@ -47,6 +47,12 @@ constexpr uint32_t DEFAULT_FOREST_SIZE = 5;
 
 constexpr uint32_t DEFAULT_TREE_HEIGHT = 5;
 
+///
+/// \brief Default population size for population-based algorithms
+///
+
+constexpr uint32_t DEFAULT_POPULATION_SIZE = 50;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__

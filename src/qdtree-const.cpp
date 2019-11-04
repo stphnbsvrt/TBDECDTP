@@ -1,6 +1,8 @@
 #include "qdtree-const.hpp"
 #include <iostream>
 #include <limits>
+#include <random>
+#include <unordered_set>
 
 namespace qdt {
 
@@ -73,6 +75,16 @@ static float calculateClassificationError(float label, const std::vector<const D
         }
     }
     return total_error;
+}
+
+uint32_t DecisionTree::getHeight() {
+    uint32_t height = 0;
+    std::shared_ptr<DecisionTreeNode> node = root_;
+    while (nullptr != node->r_child) {
+        node = node->r_child;
+        height += 1;
+    }
+    return height;
 }
 
 ///
@@ -173,6 +185,41 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::generateRandomTree(uint32_t heig
     return tree_node;
 
 }
+    
+void DecisionTree::copy(const std::shared_ptr<DecisionTreeNode>& source, std::shared_ptr<DecisionTreeNode>& dest, std::shared_ptr<DecisionTreeNode> parent) {
+    
+    // base case
+    if (source == nullptr) {
+        return;
+    }
+
+    // Allocate new structs
+    dest = std::make_shared<DecisionTreeNode>();
+    dest->parent = parent;
+
+    // Copy info
+    if (nullptr != source->decision) {
+        dest->decision = std::make_shared<Decision>();
+        dest->decision->feature = source->decision->feature;
+        dest->decision->threshold = source->decision->threshold;
+    }
+
+    dest->confidences = source->confidences;
+    dest->label = source->label;
+    dest->node_number = source->node_number;
+
+    // Recurse
+    copy(source->l_child, dest->l_child, dest);
+    copy(source->r_child, dest->r_child, dest);
+}
+
+std::shared_ptr<DecisionTree> DecisionTree::copy() {
+    
+    // Make a new decision tree
+    std::shared_ptr<DecisionTree> tree(new DecisionTree);
+    copy(root_, tree->root_, nullptr);
+    return tree;
+}
 
 void DecisionTree::fillLabels(const std::vector<const DataElem*>& training_data) {
     fillLabels(root_, training_data);
@@ -218,6 +265,187 @@ std::shared_ptr<DecisionTree> DecisionTree::randomTrain(const std::vector<const 
     // Label the nodes according to data
     tree->fillLabels(training_data);
     return tree;
+}
+
+static void tournamentSelection(const std::vector<float>& fitness, uint32_t tournament_size, uint32_t& first_idx, uint32_t& second_idx) {
+        
+        // Select parents w/ tournament
+        std::unordered_set<uint32_t> tournament_trees;
+        while (tournament_trees.size() < tournament_size) {
+            tournament_trees.insert(rand() % fitness.size());
+        }
+
+        float best_fitness = std::numeric_limits<float>::min();
+        float second_fitness = std::numeric_limits<float>::min();
+        for (auto idx : tournament_trees) {
+            if (fitness[idx] > best_fitness) {
+                second_idx = first_idx;
+                second_fitness = best_fitness;
+                first_idx = idx;
+                best_fitness = fitness[idx];
+            }
+            else if (fitness[idx] > second_fitness) {
+                second_idx = idx;
+                second_fitness = fitness[idx];
+            }
+        }
+}
+
+std::shared_ptr<DecisionTreeNode> DecisionTree::getRandomNodeAtHeight(uint32_t height) {
+    std::shared_ptr<DecisionTreeNode> ret_node = root_;
+    for (uint32_t i = 0; i < height; i++) {
+        if ((rand() % 2) == 0) {
+            ret_node = ret_node->l_child;
+        }
+        else {
+            ret_node = ret_node->r_child;
+        }
+    }
+    return ret_node;
+}
+
+void DecisionTree::fixNodeNumbers(std::shared_ptr<DecisionTreeNode> node, std::shared_ptr<DecisionTreeNode> parent, uint32_t node_number) {
+
+    if (nullptr == node) {
+        return;
+    }
+    node->node_number = node_number;
+    node->parent = parent;
+    fixNodeNumbers(node->l_child, node, (2 * node->node_number) + 1);
+    fixNodeNumbers(node->r_child, node, (2 * node->node_number) + 2);
+}
+
+void DecisionTree::repair(const std::vector<const DataElem*>& training_data) {
+
+    fixNodeNumbers(root_, nullptr, 0);
+    fillLabels(training_data);
+}
+
+static void mutateNode(std::shared_ptr<DecisionTreeNode> node, std::vector<std::string>& features, float decision_chance, std::default_random_engine& generator, std::normal_distribution<double> threshold_delta) {
+
+    if ((rand() % 100) < decision_chance) {
+        node->decision->feature = features[rand() % features.size()];
+    }
+    node->decision->threshold += threshold_delta(generator);
+}
+
+
+void DecisionTree::mutate(std::vector<std::string>& features) {
+
+    float decision_chance = getHeight() * 0.5;
+    std::default_random_engine generator;
+    std::normal_distribution<double> threshold_delta(0, 0.1);
+
+    mutateNode(root_, features, decision_chance, generator, threshold_delta);
+}
+
+static void crossover(std::shared_ptr<DecisionTree> parent_one, std::shared_ptr<DecisionTree> parent_two, const std::vector<const DataElem*>& training_data, std::vector<std::shared_ptr<DecisionTree>>& offspring) {
+
+    // Copy the parent trees
+    auto offspring_one = parent_one->copy();
+    auto offspring_two = parent_two->copy();
+
+    // Swap two random non-root nodes from the same height
+    const uint32_t HEIGHT = (rand() % (parent_one->getHeight())) + 1;
+    auto swap_node_one = offspring_one->getRandomNodeAtHeight(HEIGHT);
+    auto swap_node_two = offspring_two->getRandomNodeAtHeight(HEIGHT);
+
+    if (swap_node_one->parent->l_child->node_number == swap_node_one->node_number) {
+        swap_node_one->parent->l_child = swap_node_two;
+    }
+    else {
+        swap_node_one->parent->r_child = swap_node_two;
+    }
+
+    if (swap_node_two->parent->l_child->node_number == swap_node_two->node_number) {
+        swap_node_two->parent->l_child = swap_node_one;
+    }
+    else {
+        swap_node_two->parent->r_child = swap_node_one;
+    }
+
+    // Modify the decisions
+    std::vector<std::string> features;
+    for (auto feature : training_data[0]->features) {
+        features.push_back(feature.first);
+    }
+    offspring_one->mutate(features);
+    offspring_two->mutate(features);
+
+    // Relabel the trees and recalculate guesses
+    offspring_one->repair(training_data);
+    offspring_two->repair(training_data);
+    offspring.push_back(offspring_one);
+    offspring.push_back(offspring_two);
+
+}
+
+std::shared_ptr<DecisionTree> DecisionTree::geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size) {
+    
+    // Initialize population randomly
+    std::vector<std::shared_ptr<DecisionTree>> population;
+    std::vector<float> fitness;
+    for (uint32_t i = 0; i < population_size; i++) {
+        population.push_back(randomTrain(training_data, height));
+        fitness.push_back(population.back()->testAccuracy(training_data, false));
+    }
+
+    // Evaluate fitness
+
+    // TODO EVOLVE
+    constexpr uint32_t NUM_GENERATIONS = 200;
+    const uint32_t TOURNAMENT_SIZE = population_size / 10;
+    const uint32_t NUM_OFFSPRING = 10;
+    for (uint32_t generation = 0; generation < NUM_GENERATIONS; generation++) {
+
+        // Create offspring
+        uint32_t first_idx = 0;
+        uint32_t second_idx = 0;
+        tournamentSelection(fitness, TOURNAMENT_SIZE, first_idx, second_idx);
+        std::vector<std::shared_ptr<DecisionTree>> offspring;
+        for (uint32_t i = 0; i < NUM_OFFSPRING; i += 2) {
+            crossover(population[first_idx], population[second_idx], training_data, offspring);
+        }
+
+        // Replace
+        uint32_t worst_idx = 0;
+        float worst_fitness = std::numeric_limits<float>::max();
+        for (uint32_t i = 0; i < fitness.size(); i++) {
+            if (fitness[i] < worst_fitness) {
+                worst_fitness = fitness[i];
+                worst_idx = i;
+            }
+        }
+
+        std::shared_ptr<DecisionTree> best_offspring = nullptr;
+        float best_offspring_fitness = std::numeric_limits<float>::min();
+        for (uint32_t i = 0; i < offspring.size(); i++) {
+            float offspring_fitness = offspring[i]->testAccuracy(training_data, false);
+            if (offspring_fitness > best_offspring_fitness) {
+                best_offspring = offspring[i];
+                best_offspring_fitness = offspring_fitness;
+            }
+        }
+        //std::cout << "parent1 fitness = " << fitness[first_idx] << std::endl;
+        //std::cout << "parent2 fitness = " << fitness[second_idx] << std::endl;
+        //std::cout << "offspring fitness = " << best_offspring_fitness << std::endl;
+
+        if (worst_fitness < best_offspring_fitness) {
+            population[worst_idx] = best_offspring;
+            fitness[worst_idx] = best_offspring_fitness;
+        }
+    }
+
+    // Return best
+    uint32_t best_idx;
+    float best_fitness = std::numeric_limits<float>::min();
+    for (uint32_t i = 0; i < fitness.size(); i++) {
+        if (fitness[i] > best_fitness) {
+            best_idx = i;
+            best_fitness = fitness[i];
+        }
+    }
+    return population[best_idx];
 }
 
 float DecisionTree::testAccuracy(const std::vector<const DataElem*>& testing_data, bool verbose) {

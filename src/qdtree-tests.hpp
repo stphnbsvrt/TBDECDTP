@@ -33,6 +33,18 @@ void testCompleteRandomSingle(const std::vector<DataSet>& data, po::variables_ma
 
 void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args);
 
+///
+/// \brief Test the accuracy of a single tree genetic programming tree with provided args on the data
+///
+
+void testGeneticSingle(const std::vector<DataSet>& data, po::variables_map args);
+
+///
+/// \brief Test the accuracy of an ensemble of genetic programming trees without considering diversity
+///
+
+void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map args);
+
 }
 
 #endif // __QDTREE_TESTS_HPP__

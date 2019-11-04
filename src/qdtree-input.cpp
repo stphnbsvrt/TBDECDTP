@@ -13,6 +13,7 @@ po::variables_map parseCommandline(int argc, char** argv) {
         ("dump_data", "Dump the data elements after reading them into the app")
         ("forest_size", po::value<uint32_t>(), "Number of trees to use in the ensemble predictors")
         ("tree_height", po::value<uint32_t>(), "Height of trees to create with random generation")
+        ("population_size", po::value<uint32_t>(), "Population size to use for genetic programming algorithms")
     ;
 
     po::variables_map vm;

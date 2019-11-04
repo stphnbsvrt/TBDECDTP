@@ -162,6 +162,24 @@ public:
     } 
 
     ///
+    /// \brief Return the height of the tree
+    ///
+
+    uint32_t getHeight();
+
+    ///
+    /// \brief Get a node at the given height reached by random traversal
+    ///
+
+    std::shared_ptr<DecisionTreeNode> getRandomNodeAtHeight(uint32_t height);
+
+    ///
+    /// \brief Return a node-for-node copy of the tree
+    ///
+
+    std::shared_ptr<DecisionTree> copy();
+
+    ///
     /// \brief Generate a tree from data elements using a greedy heuristic strategy
     ///
 
@@ -172,6 +190,12 @@ public:
     ///
 
     static std::shared_ptr<DecisionTree> randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height);
+
+    ///
+    /// \brief Generate a tree using a genetic programming algorithm
+    ///
+    
+    static std::shared_ptr<DecisionTree> geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size);
 
     ///
     /// \brief Test the accuracy of the tree on a set of data
@@ -203,7 +227,25 @@ public:
 
     std::unordered_map<float, float> predictConfidence(const std::unordered_map<std::string, float> features);
 
+    ///
+    /// \brief Repair node numbers and training labels in the tree
+    ///
+
+    void repair(const std::vector<const DataElem*>& training_data);
+
+    ///
+    /// \brief Mutate the decisions in the tree
+    ///
+
+    void mutate(std::vector<std::string>& features);
+
 protected:
+
+    ///
+    /// \brief Used to recursively copy one decision tree to another
+    ///
+
+    static void copy(const std::shared_ptr<DecisionTreeNode>& source, std::shared_ptr<DecisionTreeNode>& dest, std::shared_ptr<DecisionTreeNode> parent);
 
     ///
     /// \brief Used to recursively apply greedy decision tree node generation
@@ -228,7 +270,13 @@ protected:
     ///
 
     static void fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data);
-    
+
+    ///
+    /// \brief Fix node numbers and parent pointers in a subtree
+    ///
+
+    static void fixNodeNumbers(std::shared_ptr<DecisionTreeNode> node, std::shared_ptr<DecisionTreeNode> parent, uint32_t node_number);
+
     ///
     /// \brief Default constructor
     ///

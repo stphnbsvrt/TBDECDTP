@@ -100,5 +100,66 @@ void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_
     }
     std::cout << "Got random ensemble accuracy: " << total/data.size() << std::endl;
 }
+ 
+static float testGeneticSingle(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+    
+    uint32_t tree_height = DEFAULT_TREE_HEIGHT;
+    if (0 != args.count("tree_height")) {
+        tree_height = args.at("tree_height").as<uint32_t>();
+    }
 
+    uint32_t population_size = DEFAULT_POPULATION_SIZE;
+    if (0 != args.count("population_size")) {
+        population_size = args.at("population_size").as<uint32_t>();
+    }
+
+    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size);
+    return tree->testAccuracy(testing_data, false);
+}
+
+void testGeneticSingle(const std::vector<DataSet>& data, po::variables_map args) {
+
+    float total = 0;
+    for (uint32_t i = 0; i < data.size(); i++) {
+        total += testGeneticSingle(data[i].training_data, data[i].testing_data, args);
+    }
+    std::cout << "Got genetic single accuracy: " << total/data.size() << std::endl;
+}
+
+static float testGeneticEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+
+    // Create random trees
+    uint32_t forest_size = DEFAULT_FOREST_SIZE;
+    if (0 != args.count("forest_size")) {
+        forest_size = args.at("forest_size").as<uint32_t>();
+    }
+
+    uint32_t tree_height = DEFAULT_TREE_HEIGHT;
+    if (0 != args.count("tree_height")) {
+        tree_height = args.at("tree_height").as<uint32_t>();
+    }
+
+    uint32_t population_size = DEFAULT_POPULATION_SIZE;
+    if (0 != args.count("population_size")) {
+        population_size = args.at("population_size").as<uint32_t>();
+    }
+
+    std::vector<std::shared_ptr<qdt::DecisionTree>> trees;
+    for (uint32_t i = 0; i < forest_size; i++) {
+        trees.push_back(qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size));
+    }
+
+    // Test the ensemble
+    return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+}
+
+void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
+
+    float total = 0;
+    for (uint32_t i = 0; i < data.size(); i++) {
+        total += testGeneticEnsemble(data[i].training_data, data[i].testing_data, args);
+    }
+    std::cout << "Got genetic ensemble accuracy: " << total/data.size() << std::endl;
+
+}
 }
