@@ -14,6 +14,8 @@ po::variables_map parseCommandline(int argc, char** argv) {
         ("forest_size", po::value<uint32_t>(), "Number of trees to use in the ensemble predictors")
         ("tree_height", po::value<uint32_t>(), "Height of trees to create with random generation")
         ("population_size", po::value<uint32_t>(), "Population size to use for genetic programming algorithms")
+        ("num_generations", po::value<uint32_t>(), "Number of generations to execute genetic programming algorithms")
+        ("pruning_factor", po::value<float>(), "Percentage of the training sample required for all nodes in final trees")
     ;
 
     po::variables_map vm;

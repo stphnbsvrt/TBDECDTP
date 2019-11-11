@@ -53,6 +53,18 @@ constexpr uint32_t DEFAULT_TREE_HEIGHT = 5;
 
 constexpr uint32_t DEFAULT_POPULATION_SIZE = 50;
 
+///
+/// \brief Default pruning factor. Specifies a percentage of the training sample size that every subtree must be trained on.
+///
+
+constexpr float DEFAULT_PRUNING_FACTOR = 1.0;
+
+///
+/// \brief Default number of generations for genetic algorithms
+///
+
+constexpr uint32_t DEFAULT_NUM_GENERATIONS = 100;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__

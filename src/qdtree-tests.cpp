@@ -7,8 +7,12 @@ namespace qdt {
 static float testGreedyHeuristic(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
     
     // Create a tree with greedy heuristic
-    (void)args;
-    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::greedyTrain(training_data);
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
+    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::greedyTrain(training_data, pruning_factor);
     return tree->testAccuracy(testing_data, false);
 }
 
@@ -28,6 +32,11 @@ static float testBaggingEnsemble(const std::vector<const DataElem*>& training_da
         forest_size = args.at("forest_size").as<uint32_t>();
     }
 
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
     // Create trees with greedy heuristic and bagged data
     std::vector<std::vector<const DataElem*>> bagging_data;
     std::vector<std::shared_ptr<qdt::DecisionTree>> trees;
@@ -36,7 +45,7 @@ static float testBaggingEnsemble(const std::vector<const DataElem*>& training_da
         for (uint32_t j = 0; j < training_data.size(); j++) {
             bagging_data[i].push_back(training_data[rand() % training_data.size()]);
         }
-        trees.push_back(qdt::DecisionTree::greedyTrain(bagging_data[i]));
+        trees.push_back(qdt::DecisionTree::greedyTrain(bagging_data[i], pruning_factor));
     }
     return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
 }
@@ -57,7 +66,12 @@ static float testCompleteRandomSingle(const std::vector<const DataElem*>& traini
         tree_height = args.at("tree_height").as<uint32_t>();
     }
 
-    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::randomTrain(training_data, tree_height);
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
+    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::randomTrain(training_data, tree_height, pruning_factor);
     return tree->testAccuracy(testing_data, false);
 }
 
@@ -83,9 +97,14 @@ static float testCompleteRandomEnsemble(const std::vector<const DataElem*>& trai
         tree_height = args.at("tree_height").as<uint32_t>();
     }
 
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
     std::vector<std::shared_ptr<qdt::DecisionTree>> trees;
     for (uint32_t i = 0; i < forest_size; i++) {
-        trees.push_back(qdt::DecisionTree::randomTrain(training_data, tree_height));
+        trees.push_back(qdt::DecisionTree::randomTrain(training_data, tree_height, pruning_factor));
     }
 
     // Test the ensemble
@@ -113,7 +132,18 @@ static float testGeneticSingle(const std::vector<const DataElem*>& training_data
         population_size = args.at("population_size").as<uint32_t>();
     }
 
-    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size);
+    uint32_t num_generations = DEFAULT_NUM_GENERATIONS;
+    if (0 != args.count("num_generations")) {
+        num_generations = args.at("num_generations").as<uint32_t>();
+    }
+    
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
+    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, num_generations);
+    tree->prune(training_data, pruning_factor);
     return tree->testAccuracy(testing_data, false);
 }
 
@@ -144,9 +174,20 @@ static float testGeneticEnsemble(const std::vector<const DataElem*>& training_da
         population_size = args.at("population_size").as<uint32_t>();
     }
 
+    uint32_t num_generations = DEFAULT_NUM_GENERATIONS;
+    if (0 != args.count("num_generations")) {
+        num_generations = args.at("num_generations").as<uint32_t>();
+    }
+    
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
     std::vector<std::shared_ptr<qdt::DecisionTree>> trees;
     for (uint32_t i = 0; i < forest_size; i++) {
-        trees.push_back(qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size));
+        trees.push_back(qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, num_generations));
+        trees.back()->prune(training_data, pruning_factor);
     }
 
     // Test the ensemble

@@ -183,19 +183,22 @@ public:
     /// \brief Generate a tree from data elements using a greedy heuristic strategy
     ///
 
-    static std::shared_ptr<DecisionTree> greedyTrain(const std::vector<const DataElem*>& training_data);
+    static std::shared_ptr<DecisionTree> greedyTrain(const std::vector<const DataElem*>& training_data, float pruning_factor);
 
     ///
     /// \brief Generate a tree randomly and create predictions based on the input data
     ///
+    /// \param[in] height Height of the complete tree to generate
+    /// \param[in] pruning_factor Intensity of pruning. Any node which isn't trained on this percentage of the original sample size will be pruned.
+    ///
 
-    static std::shared_ptr<DecisionTree> randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height);
+    static std::shared_ptr<DecisionTree> randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height, float pruning_factor);
 
     ///
     /// \brief Generate a tree using a genetic programming algorithm
     ///
     
-    static std::shared_ptr<DecisionTree> geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size);
+    static std::shared_ptr<DecisionTree> geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t num_generations);
 
     ///
     /// \brief Test the accuracy of the tree on a set of data
@@ -239,6 +242,12 @@ public:
 
     void mutate(std::vector<std::string>& features);
 
+    ///
+    /// \brief Fills the labels of the tree and prunes any branches reachable by a percentage training samples smaller than the specified amount
+    ///
+
+    void prune(const std::vector<const DataElem*>& training_data, float min_sample_representation);
+
 protected:
 
     ///
@@ -251,7 +260,7 @@ protected:
     /// \brief Used to recursively apply greedy decision tree node generation
     ///
 
-    static std::shared_ptr<DecisionTreeNode> greedyTrain(const std::vector<const DataElem*>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number);
+    static std::shared_ptr<DecisionTreeNode> greedyTrain(const std::vector<const DataElem*>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number, uint32_t min_samples);
 
     ///
     /// \brief Generates a complete binary tree of a given height using random decisions at each node
@@ -267,9 +276,10 @@ protected:
 
     ///
     /// \brief Recursively fill labels of decision tree nodes according to the given data
+    /// Will prune children nodes which are reached with a number of samples less than the specified minimum. I.e. 0 does no pruning.
     ///
 
-    static void fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data);
+    static void fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data, uint32_t min_samples=0);
 
     ///
     /// \brief Fix node numbers and parent pointers in a subtree

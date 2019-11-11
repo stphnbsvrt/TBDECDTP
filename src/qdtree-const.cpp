@@ -99,13 +99,19 @@ static float calculateClassificationError(const std::vector<const DataElem*>& da
     return calculateClassificationError(calculateLabelForData(data), data);
 }
 
-std::shared_ptr<DecisionTree> DecisionTree::greedyTrain(const std::vector<const DataElem*>& training_data) {
+std::shared_ptr<DecisionTree> DecisionTree::greedyTrain(const std::vector<const DataElem*>& training_data, float pruning_factor) {
+
+    // Translate pruning factor into minimum number of samples required to reach each node in the tree
+    uint32_t min_samples = (pruning_factor * 0.01) * training_data.size();
+    min_samples = (min_samples == 0) ? 1 : min_samples;
+
+    // Create the tree
     std::shared_ptr<DecisionTree> tree(new DecisionTree);
-    tree->root_ = greedyTrain(training_data, nullptr, 0);
+    tree->root_ = greedyTrain(training_data, nullptr, 0, min_samples);
     return tree;
 }
 
-std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<const DataElem*>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number) {
+std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<const DataElem*>& training_data, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number, uint32_t min_samples) {
     
     // Make a new decision tree node
     auto tree_node = std::make_shared<DecisionTreeNode>();
@@ -114,17 +120,6 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<co
     tree_node->label = calculateLabelForData(training_data);
     tree_node->confidences = calculateConfidencesForData(training_data);
 
-    // TODO: handle regression error
-    float error = calculateClassificationError(tree_node->label, training_data);
-    
-    // TODO: configure threshold
-    float threshold = 0.05 * training_data.size();
-    if (error < threshold) {
-
-        // Base case
-        return tree_node;
-    }
-    
     // Find best split
     float best_error = std::numeric_limits<float>::max();
     auto best_split = std::make_shared<Decision>();
@@ -155,13 +150,13 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<co
     }
 
     // If a best group is size 0, we're unseparable
-    if ((0 == best_left_group->size()) || (0 == best_right_group->size())) {
+    if ((best_left_group->size() < min_samples) || (best_right_group->size() < min_samples)) {
         return tree_node;
     }
 
     tree_node->decision = best_split;
-    tree_node->l_child = greedyTrain(*best_left_group, tree_node, (2 * tree_node->node_number) + 1);
-    tree_node->r_child = greedyTrain(*best_right_group, tree_node, (2 * tree_node->node_number) + 2);
+    tree_node->l_child = greedyTrain(*best_left_group, tree_node, (2 * tree_node->node_number) + 1, min_samples);
+    tree_node->r_child = greedyTrain(*best_right_group, tree_node, (2 * tree_node->node_number) + 2, min_samples);
     return tree_node;
 }
 
@@ -225,7 +220,12 @@ void DecisionTree::fillLabels(const std::vector<const DataElem*>& training_data)
     fillLabels(root_, training_data);
 }
 
-void DecisionTree::fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data) {
+void DecisionTree::prune(const std::vector<const DataElem*>& training_data, float min_sample_representation) {
+    uint32_t min_samples = (min_sample_representation * 0.01) * training_data.size();
+    fillLabels(root_, training_data, min_samples);
+}
+
+void DecisionTree::fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const std::vector<const DataElem*>& training_data, uint32_t min_samples) {
 
     // label
     tree_node->label = calculateLabelForData(training_data);
@@ -244,13 +244,21 @@ void DecisionTree::fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const
             }
         }   
 
-        // Recurse
-        fillLabels(tree_node->l_child, left_group);
-        fillLabels(tree_node->r_child, right_group);
+        // Prune if one of the children falls below the minimum sample size
+        if ((right_group.size() < min_samples) || (left_group.size() < min_samples)) {
+            tree_node->l_child = nullptr;
+            tree_node->r_child = nullptr;
+            tree_node->decision = nullptr;
+        }
+        else {
+            // Recurse
+            fillLabels(tree_node->l_child, left_group, min_samples);
+            fillLabels(tree_node->r_child, right_group, min_samples);
+        }
     }
 }
 
-std::shared_ptr<DecisionTree> DecisionTree::randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height) {
+std::shared_ptr<DecisionTree> DecisionTree::randomTrain(const std::vector<const DataElem*>& training_data, uint32_t height, float pruning_factor) {
     std::shared_ptr<DecisionTree> tree(new DecisionTree);
 
     // Find feature labels
@@ -263,7 +271,7 @@ std::shared_ptr<DecisionTree> DecisionTree::randomTrain(const std::vector<const 
     tree->root_ = generateRandomTree(height, features, nullptr, 0);
 
     // Label the nodes according to data
-    tree->fillLabels(training_data);
+    tree->prune(training_data, pruning_factor);
     return tree;
 }
 
@@ -380,23 +388,22 @@ static void crossover(std::shared_ptr<DecisionTree> parent_one, std::shared_ptr<
 
 }
 
-std::shared_ptr<DecisionTree> DecisionTree::geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size) {
+std::shared_ptr<DecisionTree> DecisionTree::geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t num_generations) {
     
     // Initialize population randomly
     std::vector<std::shared_ptr<DecisionTree>> population;
     std::vector<float> fitness;
     for (uint32_t i = 0; i < population_size; i++) {
-        population.push_back(randomTrain(training_data, height));
+        population.push_back(randomTrain(training_data, height, 0));
         fitness.push_back(population.back()->testAccuracy(training_data, false));
     }
 
     // Evaluate fitness
 
     // TODO EVOLVE
-    constexpr uint32_t NUM_GENERATIONS = 200;
     const uint32_t TOURNAMENT_SIZE = population_size / 10;
     const uint32_t NUM_OFFSPRING = 10;
-    for (uint32_t generation = 0; generation < NUM_GENERATIONS; generation++) {
+    for (uint32_t generation = 0; generation < num_generations; generation++) {
 
         // Create offspring
         uint32_t first_idx = 0;
