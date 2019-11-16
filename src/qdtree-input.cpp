@@ -16,6 +16,7 @@ po::variables_map parseCommandline(int argc, char** argv) {
         ("population_size", po::value<uint32_t>(), "Population size to use for genetic programming algorithms")
         ("num_generations", po::value<uint32_t>(), "Number of generations to execute genetic programming algorithms")
         ("pruning_factor", po::value<float>(), "Percentage of the training sample required for all nodes in final trees")
+        ("bc_bins", po::value<uint>(), "Number of equivalence classes to use for thresholds when comparing decisions")
     ;
 
     po::variables_map vm;

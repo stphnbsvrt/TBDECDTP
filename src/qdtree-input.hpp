@@ -65,6 +65,12 @@ constexpr float DEFAULT_PRUNING_FACTOR = 1.0;
 
 constexpr uint32_t DEFAULT_NUM_GENERATIONS = 100;
 
+///
+/// \brief Default number of equivalence classes to use for thresholds when creating behavioral characterizations
+///
+
+constexpr uint32_t DEFAULT_BC_BINS = 10;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__

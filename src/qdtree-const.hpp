@@ -2,9 +2,11 @@
 #define __QDTREE_CONST_HPP__
 
 #include <unordered_map>
+#include <map>
 #include <sstream>
 #include <memory>
 #include <vector>
+#include <cmath>
 
 namespace qdt {
 
@@ -97,6 +99,91 @@ struct Decision {
 };
 
 ///
+/// \brief Define equality operator for decisions so we can use them as map keys
+///
+bool operator==(const qdt::Decision& lhs, const qdt::Decision& rhs);
+
+} // namespace qdt
+
+///
+/// \brief Define hash function for decisions so we can use them as map keys
+///
+
+template <>
+struct std::hash<qdt::Decision>
+{
+std::size_t operator()(const qdt::Decision& k) const
+{
+    using std::size_t;
+    using std::hash;
+    using std::string;
+
+    // Compute individual hash values for first,
+    // second and third and combine them using XOR
+    // and bit shifting:
+
+    return ((hash<string>()(k.feature)
+            ^ (hash<float>()(k.threshold) << 1)) >> 1);
+}
+};
+
+
+///
+/// \brief Describes the structural quality of a decision tree in order to compare similarity
+///
+
+namespace qdt {
+struct DecisionTreeBehavioralCharacteristic {
+
+    ///
+    /// \brief Map of possible decision categories to their frequency of appearance in a given tree
+    /// Each appearance of a decision in a tree increases the "frequency" measure by an amount weighted by its height
+    /// For instance, the decision appearing at the root of a tree will be valued at 1 while the decision at the 
+    /// child of the root will be valued at .5. The frequency value is capped at 1.
+    ///
+
+    std::unordered_map<Decision, float> decision_frequencies;
+
+    ///
+    /// \brief Dumps the contents of the behavioral characteristic as a string
+    ///
+
+    std::string toStr() {
+        std::ostringstream oss;
+        for (auto entry : decision_frequencies) {
+            oss << "(" << entry.first.feature << " < " << entry.first.threshold << ")? - " << entry.second << std::endl;
+        }
+        return oss.str();
+    }
+
+    ///
+    /// \brief Calculates euclidean distance between this BC and another BC
+    ///
+
+    float compare(std::shared_ptr<DecisionTreeBehavioralCharacteristic> other) {
+        float sum = 0;
+
+        // Add all frequencies present in this BC
+        for (auto entry : decision_frequencies) {
+            auto other_it = other->decision_frequencies.find(entry.first);
+            float other_val = (other_it == other->decision_frequencies.end()) ? 0 : other->decision_frequencies.at(entry.first);
+            float difference = entry.second - other_val;
+            sum += difference * difference;
+        }
+
+        // Add all frequencies present in other BC not present in this BC
+        for (auto entry : other->decision_frequencies) {
+            if (decision_frequencies.find(entry.first) == decision_frequencies.end()) {
+                sum += entry.second * entry.second;
+            }
+        }
+
+        // Return square root of sum of squares
+        return std::sqrt(sum);
+    }
+};
+
+///
 /// \brief Represents a node in a decision tree
 ///
 
@@ -180,6 +267,12 @@ public:
     std::shared_ptr<DecisionTree> copy();
 
     ///
+    /// \brief Get a behavioral characteristic descriptor for the tree using a specified number of equivalence classes for thresholds
+    ///
+
+    std::shared_ptr<DecisionTreeBehavioralCharacteristic> getBehavioralCharacteristic(uint32_t num_bins);
+
+    ///
     /// \brief Generate a tree from data elements using a greedy heuristic strategy
     ///
 
@@ -255,6 +348,12 @@ protected:
     ///
 
     static void copy(const std::shared_ptr<DecisionTreeNode>& source, std::shared_ptr<DecisionTreeNode>& dest, std::shared_ptr<DecisionTreeNode> parent);
+
+    ///
+    /// \brief Used to recursively fill a behavioral characteristic
+    ///
+
+    static void addBcContribution(const std::shared_ptr<DecisionTreeNode>& node, std::shared_ptr<DecisionTreeBehavioralCharacteristic> bc, uint32_t num_bins, float value);
 
     ///
     /// \brief Used to recursively apply greedy decision tree node generation

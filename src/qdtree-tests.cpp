@@ -4,6 +4,27 @@
 
 namespace qdt {
 
+static float testDiversity(std::vector<std::shared_ptr<qdt::DecisionTree>> trees, po::variables_map args) {
+
+    uint32_t bc_bins = DEFAULT_BC_BINS;
+    if (0 != args.count("bc_bins")) {
+        bc_bins = args.at("bc_bins").as<uint32_t>();
+    }
+
+    // Expensive! Justified by being a test rather than part of the algorithm. 
+    float total = 0;
+    uint32_t divisor = 0;
+    for (auto tree1 : trees) {
+        for (auto tree2 : trees) {
+            if (tree1 != tree2) {
+                total += tree1->getBehavioralCharacteristic(bc_bins)->compare(tree2->getBehavioralCharacteristic(bc_bins));
+                divisor += 1;
+            }
+        }
+    }
+    return total / divisor;
+}
+
 static float testGreedyHeuristic(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
     
     // Create a tree with greedy heuristic
@@ -12,7 +33,13 @@ static float testGreedyHeuristic(const std::vector<const DataElem*>& training_da
         pruning_factor = args.at("pruning_factor").as<float>();
     }
 
+    uint32_t bc_bins = DEFAULT_BC_BINS;
+    if (0 != args.count("bc_bins")) {
+        bc_bins = args.at("bc_bins").as<uint32_t>();
+    }
+
     std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::greedyTrain(training_data, pruning_factor);
+    std::cout << "Tree BC: " << std::endl << tree->getBehavioralCharacteristic(bc_bins)->toStr() << std::endl;
     return tree->testAccuracy(testing_data, false);
 }
 
@@ -47,6 +74,7 @@ static float testBaggingEnsemble(const std::vector<const DataElem*>& training_da
         }
         trees.push_back(qdt::DecisionTree::greedyTrain(bagging_data[i], pruning_factor));
     }
+    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
     return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
 }
 
@@ -71,7 +99,13 @@ static float testCompleteRandomSingle(const std::vector<const DataElem*>& traini
         pruning_factor = args.at("pruning_factor").as<float>();
     }
 
+    uint32_t bc_bins = DEFAULT_BC_BINS;
+    if (0 != args.count("bc_bins")) {
+        bc_bins = args.at("bc_bins").as<uint32_t>();
+    }
+
     std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::randomTrain(training_data, tree_height, pruning_factor);
+    std::cout << "Tree BC: " << std::endl << tree->getBehavioralCharacteristic(bc_bins)->toStr() << std::endl;
     return tree->testAccuracy(testing_data, false);
 }
 
@@ -108,6 +142,7 @@ static float testCompleteRandomEnsemble(const std::vector<const DataElem*>& trai
     }
 
     // Test the ensemble
+    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
     return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
 }
 
@@ -142,8 +177,14 @@ static float testGeneticSingle(const std::vector<const DataElem*>& training_data
         pruning_factor = args.at("pruning_factor").as<float>();
     }
 
+    uint32_t bc_bins = DEFAULT_BC_BINS;
+    if (0 != args.count("bc_bins")) {
+        bc_bins = args.at("bc_bins").as<uint32_t>();
+    }
+
     std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, num_generations);
     tree->prune(training_data, pruning_factor);
+    std::cout << "Tree BC: " << std::endl << tree->getBehavioralCharacteristic(bc_bins)->toStr() << std::endl;
     return tree->testAccuracy(testing_data, false);
 }
 
@@ -191,6 +232,7 @@ static float testGeneticEnsemble(const std::vector<const DataElem*>& training_da
     }
 
     // Test the ensemble
+    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
     return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
 }
 

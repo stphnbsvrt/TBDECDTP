@@ -6,6 +6,10 @@
 
 namespace qdt {
 
+bool operator==(const qdt::Decision& lhs, const qdt::Decision& rhs) { 
+    return ((lhs.feature == rhs.feature) && (lhs.threshold == rhs.threshold));
+}
+
 ///
 /// \brief Determines the label which would be assigned to minimize the error on the data
 ///
@@ -539,4 +543,31 @@ std::unordered_map<float, float> DecisionTree::predictConfidence(const std::unor
     }
     return cur_node->confidences;
 }
+
+std::shared_ptr<DecisionTreeBehavioralCharacteristic> DecisionTree::getBehavioralCharacteristic(uint32_t num_bins) {
+    auto bc = std::make_shared<DecisionTreeBehavioralCharacteristic>();
+    addBcContribution(root_, bc, num_bins, 1);
+    return bc;
+}
+
+void DecisionTree::addBcContribution(const std::shared_ptr<DecisionTreeNode>& node, std::shared_ptr<DecisionTreeBehavioralCharacteristic> bc, uint32_t num_bins, float value) {
+    if (node->decision == nullptr) {
+        return;
+    }
+
+    // Round to nearest tenth. TODO: configure step size?
+    Decision representative;
+    representative.feature = node->decision->feature;
+    representative.threshold = ((int)(node->decision->threshold * num_bins)) / (float)num_bins;
+
+    // Add frequency contribution to representative decision
+    float frequency = bc->decision_frequencies[representative];
+    frequency = ((frequency + value) >= 1) ? 1 : frequency + value;
+    bc->decision_frequencies[representative] = frequency;
+
+    // Recurse
+    addBcContribution(node->l_child, bc, num_bins, value/2);
+    addBcContribution(node->r_child, bc, num_bins, value/2);
+}
+
 }
