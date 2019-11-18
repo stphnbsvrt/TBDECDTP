@@ -10,6 +10,22 @@ bool operator==(const qdt::Decision& lhs, const qdt::Decision& rhs) {
     return ((lhs.feature == rhs.feature) && (lhs.threshold == rhs.threshold));
 }
 
+bool operator==(const qdt::DecisionTreeBehavioralCharacteristic& lhs, const qdt::DecisionTreeBehavioralCharacteristic& rhs) {
+
+    if (lhs.decision_frequencies.size() != rhs.decision_frequencies.size()) {
+        return false;
+    }
+    for (auto frequency : lhs.decision_frequencies) {
+        if (rhs.decision_frequencies.find(frequency.first) == rhs.decision_frequencies.end()) {
+            return false;
+        }
+        if (rhs.decision_frequencies.at(frequency.first) != frequency.second) {
+            return false;
+        }
+    }
+    return true;
+}
+
 ///
 /// \brief Determines the label which would be assigned to minimize the error on the data
 ///
@@ -392,7 +408,8 @@ static void crossover(std::shared_ptr<DecisionTree> parent_one, std::shared_ptr<
 
 }
 
-std::shared_ptr<DecisionTree> DecisionTree::geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t num_generations) {
+std::vector<std::shared_ptr<DecisionTree>> DecisionTree::geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, 
+                                                                                 uint32_t population_size, uint32_t forest_size, uint32_t num_generations) {
     
     // Initialize population randomly
     std::vector<std::shared_ptr<DecisionTree>> population;
@@ -447,16 +464,30 @@ std::shared_ptr<DecisionTree> DecisionTree::geneticProgrammingTrain(const std::v
         }
     }
 
-    // Return best
-    uint32_t best_idx;
-    float best_fitness = std::numeric_limits<float>::min();
-    for (uint32_t i = 0; i < fitness.size(); i++) {
-        if (fitness[i] > best_fitness) {
-            best_idx = i;
-            best_fitness = fitness[i];
+    std::vector<std::shared_ptr<DecisionTree>> return_vector;
+    if (forest_size == 1) {
+        
+        // Return best if forest size is 1
+        uint32_t best_idx;
+        float best_fitness = std::numeric_limits<float>::min();
+        for (uint32_t i = 0; i < fitness.size(); i++) {
+            if (fitness[i] > best_fitness) {
+                best_idx = i;
+                best_fitness = fitness[i];
+            }
+        }
+        return_vector.push_back(population[best_idx]);
+    }
+    else {
+
+        // Return random elements otherwise
+        while (return_vector.size() < forest_size) {
+            uint32_t idx = rand() % population.size();
+            return_vector.push_back(population[idx]);
+            population.erase(population.begin() + idx);
         }
     }
-    return population[best_idx];
+    return return_vector;
 }
 
 float DecisionTree::testAccuracy(const std::vector<const DataElem*>& testing_data, bool verbose) {
@@ -568,6 +599,83 @@ void DecisionTree::addBcContribution(const std::shared_ptr<DecisionTreeNode>& no
     // Recurse
     addBcContribution(node->l_child, bc, num_bins, value/2);
     addBcContribution(node->r_child, bc, num_bins, value/2);
+}
+
+std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vector<const DataElem*>& training_data, uint32_t height, 
+                                                                 uint32_t population_size, uint32_t forest_size, uint32_t num_generations, uint32_t num_bc_bins) {
+
+    // Initialize an empty container of trees
+    // TODO: other container types
+    std::unordered_map<DecisionTreeBehavioralCharacteristic, std::shared_ptr<DecisionTree>> container;
+
+    // Generate random trees to initialize container with a population
+    while (container.size() < population_size) {
+        auto tree = randomTrain(training_data, height, 0);
+        auto grid_location = tree->getBehavioralCharacteristic(num_bc_bins);
+        if (container.find(*grid_location) == container.end()) {
+            container.insert({*grid_location, tree});
+        }
+    }   
+
+    // Repeat for generations
+    for (uint32_t i = 0; i < num_generations; i++) {
+        // Select parents randomly from container
+        // TODO: other selection types
+        size_t bucket_num, bucket_offset;
+        do {
+            bucket_num = rand() % container.bucket_count();
+        } 
+        while ((bucket_offset = container.bucket_size(bucket_num)) == 0);
+        bucket_offset = rand() % bucket_offset;
+        std::shared_ptr<DecisionTree> parent1 = std::next(container.begin(bucket_num), bucket_offset)->second;
+        
+        do {
+            bucket_num = rand() % container.bucket_count();
+        } 
+        while ((bucket_offset = container.bucket_size(bucket_num)) == 0);
+        bucket_offset = rand() % bucket_offset;
+        std::shared_ptr<DecisionTree> parent2 = std::next(container.begin(bucket_num), bucket_offset)->second;
+
+        // Generate children
+        constexpr uint32_t NUM_OFFSPRING = 10;
+        std::vector<std::shared_ptr<DecisionTree>> offspring;
+        for (uint32_t i = 0; i < NUM_OFFSPRING; i += 2) {
+            crossover(parent1, parent2, training_data, offspring);
+        }
+
+        // Add children to archive if they're more fit than current representative
+        for (auto child : offspring) {
+            auto grid_location = child->getBehavioralCharacteristic(num_bc_bins);
+
+            // Add if there's no representative
+            if (container.find(*grid_location) == container.end()) {
+                container.insert({*grid_location, child});
+            }        
+
+            // Or if better than current
+            if (container.at(*grid_location)->testAccuracy(training_data, false) < child->testAccuracy(training_data, false)) {
+                container[*grid_location] = child;
+            }
+        }
+    }
+
+    // Return a forest
+    // TODO: do smartly?
+    std::vector<std::shared_ptr<DecisionTree>> return_vector;
+    while (return_vector.size() < forest_size) {
+
+        // Pull random tree from archive
+        size_t bucket_num, bucket_offset;
+        do {
+            bucket_num = rand() % container.bucket_count();
+        } 
+        while ((bucket_offset = container.bucket_size(bucket_num)) == 0);
+        bucket_offset = rand() % bucket_offset;
+        auto it = std::next(container.begin(bucket_num), bucket_offset);
+        return_vector.push_back(it->second);
+        container.erase(container.find(it->first));
+    }
+    return return_vector;
 }
 
 }

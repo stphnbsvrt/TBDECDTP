@@ -45,6 +45,12 @@ void testGeneticSingle(const std::vector<DataSet>& data, po::variables_map args)
 
 void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map args);
 
+///
+/// \brief Test the accuracy of a decision tree formulated from a QD algorithm
+///
+
+void testQD(const std::vector<DataSet>& data, po::variables_map args);
+
 }
 
 #endif // __QDTREE_TESTS_HPP__

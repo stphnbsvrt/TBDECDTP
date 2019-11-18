@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
 
     // Test genetic programming ensemble
     qdt::testGeneticEnsemble(data_sets, args);
-    
-    //qdt::testQD
+  
+    // Test QD algorithm returning single tree
+    qdt::testQD(data_sets, args);
 }

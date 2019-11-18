@@ -184,6 +184,40 @@ struct DecisionTreeBehavioralCharacteristic {
 };
 
 ///
+/// \brief Define equality operator for decisions so we can use them as map keys
+///
+bool operator==(const qdt::DecisionTreeBehavioralCharacteristic& lhs, const qdt::DecisionTreeBehavioralCharacteristic& rhs);
+
+} // namespace qdt
+
+///
+/// \brief Define hash function for decisions so we can use them as map keys
+///
+
+template <>
+struct std::hash<qdt::DecisionTreeBehavioralCharacteristic>
+{
+std::size_t operator()(const qdt::DecisionTreeBehavioralCharacteristic& k) const
+{
+    using std::size_t;
+    using std::hash;
+    using std::string;
+
+    // Compute individual hash values for first,
+    // second and third and combine them using XOR
+    // and bit shifting:
+    size_t output = 0;
+    uint32_t counter = 0;
+    for (auto frequency : k.decision_frequencies) {
+        output ^= hash<qdt::Decision>()(frequency.first) << counter;
+        counter++;
+    }
+    return output;
+}
+};
+
+namespace qdt {
+///
 /// \brief Represents a node in a decision tree
 ///
 
@@ -291,7 +325,15 @@ public:
     /// \brief Generate a tree using a genetic programming algorithm
     ///
     
-    static std::shared_ptr<DecisionTree> geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t num_generations);
+    static std::vector<std::shared_ptr<DecisionTree>> geneticProgrammingTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, 
+                                                                              uint32_t forest_size, uint32_t num_generations);
+
+    ///
+    /// \brief Generate an ensemble of trees using a QD algorithm
+    ///
+
+    static std::vector<std::shared_ptr<DecisionTree>> QDTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t forest_size, 
+                                                              uint32_t num_generations, uint32_t num_bc_bins);
 
     ///
     /// \brief Test the accuracy of the tree on a set of data

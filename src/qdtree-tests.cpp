@@ -45,6 +45,7 @@ static float testGreedyHeuristic(const std::vector<const DataElem*>& training_da
 
 void testGreedyHeuristic(const std::vector<DataSet>& data, po::variables_map args) {
 
+    std::cout << std::endl << "------Greedy heuristic test----------" << std::endl;
     float total = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         total += testGreedyHeuristic(data[i].training_data, data[i].testing_data, args);
@@ -79,7 +80,8 @@ static float testBaggingEnsemble(const std::vector<const DataElem*>& training_da
 }
 
 void testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
-
+    
+    std::cout << std::endl << "------Bagging ensemble test----------" << std::endl;
     float total = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         total += testBaggingEnsemble(data[i].training_data, data[i].testing_data, args);
@@ -111,6 +113,7 @@ static float testCompleteRandomSingle(const std::vector<const DataElem*>& traini
 
 void testCompleteRandomSingle(const std::vector<DataSet>& data, po::variables_map args) {
 
+    std::cout << std::endl << "------Complete random tree test----------" << std::endl;
     float total = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         total += testCompleteRandomSingle(data[i].training_data, data[i].testing_data, args);
@@ -148,6 +151,7 @@ static float testCompleteRandomEnsemble(const std::vector<const DataElem*>& trai
 
 void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
 
+    std::cout << std::endl << "------Complete random ensemble test----------" << std::endl;
     float total = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         total += testCompleteRandomEnsemble(data[i].training_data, data[i].testing_data, args);
@@ -182,7 +186,7 @@ static float testGeneticSingle(const std::vector<const DataElem*>& training_data
         bc_bins = args.at("bc_bins").as<uint32_t>();
     }
 
-    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, num_generations);
+    std::shared_ptr<qdt::DecisionTree> tree = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, 1, num_generations)[0];
     tree->prune(training_data, pruning_factor);
     std::cout << "Tree BC: " << std::endl << tree->getBehavioralCharacteristic(bc_bins)->toStr() << std::endl;
     return tree->testAccuracy(testing_data, false);
@@ -190,6 +194,7 @@ static float testGeneticSingle(const std::vector<const DataElem*>& training_data
 
 void testGeneticSingle(const std::vector<DataSet>& data, po::variables_map args) {
 
+    std::cout << std::endl << "------Genetic single tree test----------" << std::endl;
     float total = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         total += testGeneticSingle(data[i].training_data, data[i].testing_data, args);
@@ -225,9 +230,8 @@ static float testGeneticEnsemble(const std::vector<const DataElem*>& training_da
         pruning_factor = args.at("pruning_factor").as<float>();
     }
 
-    std::vector<std::shared_ptr<qdt::DecisionTree>> trees;
-    for (uint32_t i = 0; i < forest_size; i++) {
-        trees.push_back(qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, num_generations));
+    std::vector<std::shared_ptr<qdt::DecisionTree>> trees = qdt::DecisionTree::geneticProgrammingTrain(training_data, tree_height, population_size, forest_size, num_generations);
+    for (uint32_t i = 0; i < trees.size(); i++) {
         trees.back()->prune(training_data, pruning_factor);
     }
 
@@ -238,6 +242,7 @@ static float testGeneticEnsemble(const std::vector<const DataElem*>& training_da
 
 void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
 
+    std::cout << std::endl << "------Genetic restart ensemble tree test----------" << std::endl;
     float total = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
         total += testGeneticEnsemble(data[i].training_data, data[i].testing_data, args);
@@ -245,4 +250,59 @@ void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map arg
     std::cout << "Got genetic ensemble accuracy: " << total/data.size() << std::endl;
 
 }
+
+static float testQD(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+
+    // Create random trees
+    uint32_t forest_size = DEFAULT_FOREST_SIZE;
+    if (0 != args.count("forest_size")) {
+        forest_size = args.at("forest_size").as<uint32_t>();
+    }
+
+    uint32_t tree_height = DEFAULT_TREE_HEIGHT;
+    if (0 != args.count("tree_height")) {
+        tree_height = args.at("tree_height").as<uint32_t>();
+    }
+
+    uint32_t population_size = DEFAULT_POPULATION_SIZE;
+    if (0 != args.count("population_size")) {
+        population_size = args.at("population_size").as<uint32_t>();
+    }
+
+    uint32_t num_generations = DEFAULT_NUM_GENERATIONS;
+    if (0 != args.count("num_generations")) {
+        num_generations = args.at("num_generations").as<uint32_t>();
+    }
+    
+    float pruning_factor = DEFAULT_PRUNING_FACTOR;
+    if (0 != args.count("pruning_factor")) {
+        pruning_factor = args.at("pruning_factor").as<float>();
+    }
+
+    uint32_t bc_bins = DEFAULT_BC_BINS;
+    if (0 != args.count("bc_bins")) {
+        bc_bins = args.at("bc_bins").as<uint32_t>();
+    }
+
+    std::vector<std::shared_ptr<qdt::DecisionTree>> trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins);
+    for (auto tree : trees) {
+        tree->prune(training_data, pruning_factor);
+    }
+
+    // Test the ensemble
+    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
+    return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+}
+
+void testQD(const std::vector<DataSet>& data, po::variables_map args) {
+ 
+    std::cout << std::endl << "------QD algorithm test----------" << std::endl;
+    float total = 0;
+    for (uint32_t i = 0; i < data.size(); i++) {
+        total += testQD(data[i].training_data, data[i].testing_data, args);
+    }
+    std::cout << "Got QD algorithm accuracy: " << total/data.size() << std::endl;
+
+}
+
 }
