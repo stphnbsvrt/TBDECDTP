@@ -21,7 +21,7 @@ struct DataElem {
     ///
 
     DataElem(uint64_t id) : id(id) {}
-    const uint64_t id;
+    uint64_t id;
 
     ///
     /// \brief Output (i.e. of classification or regression) of the data point
@@ -245,7 +245,7 @@ struct DecisionTreeNode {
     /// \brief Pointer to the parent of this node - nullptr if it is a root
     ///
 
-    std::shared_ptr<DecisionTreeNode> parent;
+    std::weak_ptr<DecisionTreeNode> parent;
 
     ///
     /// \brief Pointer to the left child of this node - nullptr if leaf

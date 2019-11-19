@@ -17,6 +17,7 @@ po::variables_map parseCommandline(int argc, char** argv) {
         ("num_generations", po::value<uint32_t>(), "Number of generations to execute genetic programming algorithms")
         ("pruning_factor", po::value<float>(), "Percentage of the training sample required for all nodes in final trees")
         ("bc_bins", po::value<uint>(), "Number of equivalence classes to use for thresholds when comparing decisions")
+        ("num_folds", po::value<uint32_t>(), "Number of folds to use for cross validation")
     ;
 
     po::variables_map vm;
@@ -74,21 +75,41 @@ std::vector<DataElem> parseJson(std::string json_file) {
 
 std::vector<DataSet> createDataSets(const std::vector<DataElem>& data, po::variables_map args) {
 
-    // FIXME: args options - 10 fold cross validation
-    (void)args;
-    int training_chance = 66;
-    std::vector<DataSet> ret_sets;
-    DataSet set;
-    for (auto& elem : data) {
-        if ((rand() % 100) < training_chance) {
-            set.training_data.push_back(&elem);
-        }
-        else {
-            set.testing_data.push_back(&elem);
+    uint32_t num_folds = DEFAULT_NUM_FOLDS;
+    if (0 != args.count("num_folds")) {
+        num_folds = args.at("num_folds").as<uint32_t>();
+    }
+    (void)num_folds;
+
+    // First group by label
+    std::unordered_map<float, std::vector<const DataElem*>> groups;
+    for (auto& entry : data) {
+        groups[entry.output].push_back(&entry);
+    }
+
+    // Shuffle them then distribute round robin
+    std::vector<std::vector<const DataElem*>> data_folds = std::vector<std::vector<const DataElem*>>(num_folds, std::vector<const DataElem*>());
+    for (auto& group : groups) {
+        std::random_shuffle(group.second.begin(), group.second.end());
+        for (uint32_t i = 0; i < group.second.size(); i++) {
+            data_folds[i % data_folds.size()].push_back(group.second[i]);
         }
     }
-    ret_sets.push_back(set);
-    return ret_sets;
+
+    // Create data sets
+    std::vector<DataSet> data_sets = std::vector<DataSet>(num_folds, DataSet());
+    for (uint32_t i = 0; i < data_sets.size(); i++) {
+        for (uint32_t j = 0; j < data_folds.size(); j++) {
+            if (j == i) {
+                data_sets[i].training_data.insert(data_sets[i].training_data.begin(), data_folds[j].begin(), data_folds[j].end());
+            }
+            else {
+                data_sets[i].testing_data.insert(data_sets[i].testing_data.begin(), data_folds[j].begin(), data_folds[j].end());
+            }
+        }
+    }
+
+    return data_sets;
 }
 
 }

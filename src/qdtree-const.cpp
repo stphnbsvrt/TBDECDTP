@@ -378,18 +378,18 @@ static void crossover(std::shared_ptr<DecisionTree> parent_one, std::shared_ptr<
     auto swap_node_one = offspring_one->getRandomNodeAtHeight(HEIGHT);
     auto swap_node_two = offspring_two->getRandomNodeAtHeight(HEIGHT);
 
-    if (swap_node_one->parent->l_child->node_number == swap_node_one->node_number) {
-        swap_node_one->parent->l_child = swap_node_two;
+    if (swap_node_one->parent.lock()->l_child->node_number == swap_node_one->node_number) {
+        swap_node_one->parent.lock()->l_child = swap_node_two;
     }
     else {
-        swap_node_one->parent->r_child = swap_node_two;
+        swap_node_one->parent.lock()->r_child = swap_node_two;
     }
 
-    if (swap_node_two->parent->l_child->node_number == swap_node_two->node_number) {
-        swap_node_two->parent->l_child = swap_node_one;
+    if (swap_node_two->parent.lock()->l_child->node_number == swap_node_two->node_number) {
+        swap_node_two->parent.lock()->l_child = swap_node_one;
     }
     else {
-        swap_node_two->parent->r_child = swap_node_one;
+        swap_node_two->parent.lock()->r_child = swap_node_one;
     }
 
     // Modify the decisions

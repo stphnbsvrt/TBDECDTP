@@ -71,6 +71,12 @@ constexpr uint32_t DEFAULT_NUM_GENERATIONS = 100;
 
 constexpr uint32_t DEFAULT_BC_BINS = 10;
 
+///
+/// \brief Default number of folds to use for cross validation
+///
+
+constexpr uint32_t DEFAULT_NUM_FOLDS = 10;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__
