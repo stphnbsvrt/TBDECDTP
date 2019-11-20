@@ -2,11 +2,13 @@
 #define __QDTREE_CONST_HPP__
 
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <sstream>
 #include <memory>
 #include <vector>
 #include <cmath>
+#include <iostream>
 
 namespace qdt {
 
@@ -31,9 +33,11 @@ struct DataElem {
 
     ///
     /// \brief Collection of string->float features for the data point
+    /// Bool indicates whether the feature is real valued.
     ///
 
-    std::unordered_map<std::string, float> features;
+    std::unordered_map<std::string, std::pair<float, bool>> features;
+
 
     ///
     /// \brief Returns string representation of the element
@@ -43,7 +47,7 @@ struct DataElem {
         std::ostringstream oss;
         oss << "Output: " << output << std::endl;
         for (auto feature : features) {
-            oss << "  " << feature.first << ":" << feature.second << std::endl;
+            oss << "  " << feature.first << ":" << feature.second.first << std::endl;
         }
         return oss.str();
     }
@@ -66,6 +70,14 @@ struct DataSet {
     ///
 
     std::vector<const DataElem*> testing_data;
+
+    ///
+    /// \brief Map of discrete-valued features to their possible values
+    /// Note we can only use one data set at a time with this implementation
+    ///
+
+    static std::unordered_map<std::string, std::unordered_set<float>> discrete_features;
+
 };
 
 ///
@@ -81,7 +93,8 @@ struct Decision {
     std::string feature;
 
     ///
-    /// \brief Split threshold for the decision
+    /// \brief Split threshold for a real-valued feature decision
+    /// If feature is a classification, represents the exact feature value which indicates a left branch
     ///
 
     float threshold;
@@ -93,8 +106,13 @@ struct Decision {
     /// Otherwise false, indicating right branch.
     ///
 
-    bool test(const std::unordered_map<std::string, float>& test_features) {
-        return test_features.at(feature) < threshold;
+    bool test(const std::unordered_map<std::string, std::pair<float, bool>>& test_features) {
+        if (test_features.at(feature).second == true) {
+            return test_features.at(feature).first < threshold;
+        }
+        else {
+            return (int)test_features.at(feature).first == (int)threshold;
+        }
     }
 };
 
@@ -357,13 +375,13 @@ public:
     /// \brief Predict a label for a set of features using the decision tree
     ///
 
-    float predict(const std::unordered_map<std::string, float> features);
+    float predict(const std::unordered_map<std::string, std::pair<float, bool>> features);
 
     ///
     /// \brief Predict with confidence for a set of features using the decision tree
     ///
 
-    std::unordered_map<float, float> predictConfidence(const std::unordered_map<std::string, float> features);
+    std::unordered_map<float, float> predictConfidence(const std::unordered_map<std::string, std::pair<float, bool>> features);
 
     ///
     /// \brief Repair node numbers and training labels in the tree

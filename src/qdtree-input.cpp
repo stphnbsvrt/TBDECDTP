@@ -48,6 +48,7 @@ std::vector<DataElem> parseJson(std::string json_file) {
     Json::parseFromStream(reader_builder, ifs, &obj, &errs);
 
     // Group features by ID key
+    std::unordered_map<std::string, std::unordered_map<std::string, float>> discrete_feature_map;
     auto members = obj.getMemberNames();
     for (auto member : members) {
         auto members2 = obj[member].getMemberNames();
@@ -57,13 +58,46 @@ std::vector<DataElem> parseJson(std::string json_file) {
                 data.emplace(id, DataElem(id));
             }
             if (member == "classification") {
-                data.at(id).output = obj[member][member2].asFloat();
+                if (obj[member][member2].isDouble()) {
+                    data.at(id).output = obj[member][member2].asFloat();
+                }
+                else {
+                    std::string feature_category = obj[member][member2].asString();
+                    if (discrete_feature_map[member].find(feature_category) == discrete_feature_map[member].end()) {
+                        discrete_feature_map[member].insert({feature_category, discrete_feature_map[member].size()});
+                    }         
+                    data.at(id).output = discrete_feature_map.at(member).at(feature_category);    
+                }
+
             }
             else {
-                data.at(id).features.emplace(member, obj[member][member2].asFloat());
+                if (obj[member][member2].isDouble()) {
+                    data.at(id).features.emplace(member, std::pair<float, bool>(obj[member][member2].asFloat(), true));
+                }
+                else {
+                    std::string feature_category = obj[member][member2].asString();
+                    if (discrete_feature_map[member].find(feature_category) == discrete_feature_map[member].end()) {
+                        discrete_feature_map[member].insert({feature_category, discrete_feature_map[member].size()});
+                    }
+                    data.at(id).features.emplace(member, std::pair<float, bool>(discrete_feature_map.at(member).at(feature_category), false));
+                }
             }
         }
     }
+
+    // Print string->float mappings and copy to return set
+    if (discrete_feature_map.size() > 0) {
+        std::cout << "Mapped string feature names: " << std::endl;
+        for (auto entry : discrete_feature_map) {
+            DataSet::discrete_features[entry.first] = std::unordered_set<float>();
+            std::cout << "  Feature: " << entry.first << std::endl;
+            for (auto entry2 : entry.second) {
+                DataSet::discrete_features[entry.first].insert(entry2.second);
+                std::cout << "   Category " << entry2.first << " --> " << entry2.second << std::endl;
+            }
+        }
+    }
+
 
     // Move to a vector
     std::vector<DataElem> data_vec;

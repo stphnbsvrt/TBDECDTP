@@ -6,6 +6,8 @@
 
 namespace qdt {
 
+std::unordered_map<std::string, std::unordered_set<float>> DataSet::discrete_features;
+
 bool operator==(const qdt::Decision& lhs, const qdt::Decision& rhs) { 
     return ((lhs.feature == rhs.feature) && (lhs.threshold == rhs.threshold));
 }
@@ -146,25 +148,56 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<co
     std::shared_ptr<std::vector<const DataElem*>> best_left_group;
     std::shared_ptr<std::vector<const DataElem*>> best_right_group;
     for (auto feature : training_data[0]->features) {
-        std::string feature_key = feature.first;
-        for (float split = 0.0; split < 1.0; split += 0.10) {
-            auto left_group = std::make_shared<std::vector<const DataElem*>>();
-            auto right_group = std::make_shared<std::vector<const DataElem*>>();
-            for (auto elem : training_data) {
-                if (elem->features.at(feature_key) < split) {
-                    left_group->push_back(elem);
+
+        std::string feature_key = feature.first; 
+
+        // Check threshold values if feature is real valued
+        if (feature.second.second == true) {
+
+            for (float split = 0.0; split < 1.0; split += 0.10) {
+                auto left_group = std::make_shared<std::vector<const DataElem*>>();
+                auto right_group = std::make_shared<std::vector<const DataElem*>>();
+                for (auto elem : training_data) {
+                    if (elem->features.at(feature_key).first < split) {
+                        left_group->push_back(elem);
+                    }
+                    else {
+                        right_group->push_back(elem);
+                    }
                 }
-                else {
-                    right_group->push_back(elem);
+                float new_error = calculateClassificationError(*left_group) + calculateClassificationError(*right_group);
+                if (new_error < best_error) {
+                    best_error = new_error;
+                    best_split->feature = feature_key;
+                    best_split->threshold = split;
+                    best_left_group = left_group;
+                    best_right_group = right_group;
                 }
             }
-            float new_error = calculateClassificationError(*left_group) + calculateClassificationError(*right_group);
-            if (new_error < best_error) {
-                best_error = new_error;
-                best_split->feature = feature_key;
-                best_split->threshold = split;
-                best_left_group = left_group;
-                best_right_group = right_group;
+        }
+        else {
+
+            for (auto possible_value : DataSet::discrete_features.at(feature_key)) {
+
+                auto left_group = std::make_shared<std::vector<const DataElem*>>();
+                auto right_group = std::make_shared<std::vector<const DataElem*>>();
+                for (auto elem : training_data) {
+                    if (elem->features.at(feature_key).first == possible_value) {
+                        left_group->push_back(elem);
+                    }
+                    else {
+                        right_group->push_back(elem);
+                    }
+                }
+
+                float new_error = calculateClassificationError(*left_group) + calculateClassificationError(*right_group);
+                if (new_error < best_error) {
+                    best_error = new_error;
+                    best_split->feature = feature_key;
+                    best_split->threshold = possible_value;
+                    best_left_group = left_group;
+                    best_right_group = right_group;
+                }                
             }
         }
     }
@@ -191,7 +224,16 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::generateRandomTree(uint32_t heig
     if (1 <= height) {
         tree_node->decision = std::make_shared<Decision>();
         tree_node->decision->feature = features[rand() % features.size()];
-        tree_node->decision->threshold = 0.01 * (rand() % 100);
+
+        if (DataSet::discrete_features.find(tree_node->decision->feature) == DataSet::discrete_features.end()) {
+            tree_node->decision->threshold = 0.01 * (rand() % 100);
+        }
+        else {
+            auto& choices = DataSet::discrete_features[tree_node->decision->feature];
+            auto iterator = choices.begin();
+            std::advance(iterator, (rand() % choices.size()));
+            tree_node->decision->threshold = *iterator;
+        }
 
         // Fill child nodes
         tree_node->l_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 1);
@@ -256,20 +298,31 @@ void DecisionTree::fillLabels(std::shared_ptr<DecisionTreeNode> tree_node, const
         std::vector<const DataElem*> left_group;
         std::vector<const DataElem*> right_group;
         for (auto elem : training_data) {
-            if (elem->features.at(tree_node->decision->feature) < tree_node->decision->threshold) {
-                left_group.push_back(elem);
+
+            if (elem->features.at(tree_node->decision->feature).second == true) {
+                if (elem->features.at(tree_node->decision->feature).first < tree_node->decision->threshold) {
+                    left_group.push_back(elem);
+                }
+                else {
+                    right_group.push_back(elem);
+                }
             }
             else {
-                right_group.push_back(elem);
+                if (elem->features.at(tree_node->decision->feature).first == tree_node->decision->threshold) {
+                    left_group.push_back(elem);
+                }
+                else {
+                    right_group.push_back(elem);
+                }                
             }
         }   
 
-        // Prune if one of the children falls below the minimum sample size
-        if ((right_group.size() < min_samples) || (left_group.size() < min_samples)) {
+        // Prune if node has a small sample size
+        if ((right_group.size() + left_group.size()) < min_samples) {
             tree_node->l_child = nullptr;
             tree_node->r_child = nullptr;
             tree_node->decision = nullptr;
-        }
+        }       
         else {
             // Recurse
             fillLabels(tree_node->l_child, left_group, min_samples);
@@ -354,7 +407,18 @@ static void mutateNode(std::shared_ptr<DecisionTreeNode> node, std::vector<std::
     if ((rand() % 100) < decision_chance) {
         node->decision->feature = features[rand() % features.size()];
     }
-    node->decision->threshold += threshold_delta(generator);
+    if (DataSet::discrete_features.find(node->decision->feature) == DataSet::discrete_features.end()) {
+        node->decision->threshold += threshold_delta(generator);
+    }
+    else {
+        if ((rand() % 100) < decision_chance) {
+            auto& choices = DataSet::discrete_features[node->decision->feature];
+            auto iterator = choices.begin();
+            std::advance(iterator, (rand() % choices.size()));
+            node->decision->threshold = *iterator;
+        }
+    }
+
 }
 
 
@@ -424,8 +488,10 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::geneticProgrammingTrain
     // TODO EVOLVE
     const uint32_t TOURNAMENT_SIZE = population_size / 10;
     const uint32_t NUM_OFFSPRING = 10;
+    std::cout << "evolution progress: 0%" << std::endl;
     for (uint32_t generation = 0; generation < num_generations; generation++) {
 
+        std::cout << "\x1b[A" << "evolution progress: " << (((float)generation)/num_generations) * 100 << "%" << std::endl; 
         // Create offspring
         uint32_t first_idx = 0;
         uint32_t second_idx = 0;
@@ -546,7 +612,7 @@ float DecisionTree::testEnsembleAccuracy(const std::vector<std::shared_ptr<Decis
     return (float)num_correct / testing_data.size();
 }
 
-float DecisionTree::predict(const std::unordered_map<std::string, float> features) {
+float DecisionTree::predict(const std::unordered_map<std::string, std::pair<float, bool>> features) {
 
     auto cur_node = getRoot();
     while (cur_node->decision != nullptr) {
@@ -561,7 +627,7 @@ float DecisionTree::predict(const std::unordered_map<std::string, float> feature
 }
 
 
-std::unordered_map<float, float> DecisionTree::predictConfidence(const std::unordered_map<std::string, float> features) {
+std::unordered_map<float, float> DecisionTree::predictConfidence(const std::unordered_map<std::string, std::pair<float, bool>> features) {
 
     auto cur_node = getRoot();
     while (cur_node->decision != nullptr) {
@@ -618,9 +684,11 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
     }   
 
     // Repeat for generations
+    std::cout << "evolution progress: 0%" << std::endl;
     for (uint32_t i = 0; i < num_generations; i++) {
         // Select parents randomly from container
         // TODO: other selection types
+        std::cout << "\x1b[A" << "evolution progress: " << (((float)i)/num_generations) * 100 << "%" << std::endl; 
         size_t bucket_num, bucket_offset;
         do {
             bucket_num = rand() % container.bucket_count();
