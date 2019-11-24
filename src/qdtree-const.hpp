@@ -9,6 +9,7 @@
 #include <vector>
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 namespace qdt {
 
@@ -223,12 +224,9 @@ std::size_t operator()(const qdt::DecisionTreeBehavioralCharacteristic& k) const
 
     // Compute individual hash values for first,
     // second and third and combine them using XOR
-    // and bit shifting:
     size_t output = 0;
-    uint32_t counter = 0;
     for (auto frequency : k.decision_frequencies) {
-        output ^= hash<qdt::Decision>()(frequency.first) << counter;
-        counter++;
+        output ^= hash<qdt::Decision>()(frequency.first);
     }
     return output;
 }
@@ -239,6 +237,7 @@ namespace qdt {
 /// \brief Represents a node in a decision tree
 ///
 
+constexpr float NOT_LABELED = std::numeric_limits<float>::min();
 struct DecisionTreeNode {
 
     ///
@@ -251,7 +250,7 @@ struct DecisionTreeNode {
     /// \brief The label guess for this node
     ///
 
-    float label;
+    float label = NOT_LABELED;
 
     ///
     /// \brief The confidence of each label for this node
@@ -351,7 +350,7 @@ public:
     ///
 
     static std::vector<std::shared_ptr<DecisionTree>> QDTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t forest_size, 
-                                                              uint32_t num_generations, uint32_t num_bc_bins);
+                                                              uint32_t num_generations, uint32_t num_bc_bins, uint32_t min_distance_percentage);
 
     ///
     /// \brief Test the accuracy of the tree on a set of data
@@ -360,7 +359,7 @@ public:
     /// \return Percent accuracy of the predictions over the data set
     ///
 
-    float testAccuracy(const std::vector<const DataElem*>& testing_data, bool verbose);
+    float testAccuracy(const std::vector<const DataElem*>& testing_data, bool verbose, std::vector<float>* predictions=nullptr);
 
     ///
     /// \brief Test the accuracy of an ensemble of trees on a set of data

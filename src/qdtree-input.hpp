@@ -77,6 +77,12 @@ constexpr uint32_t DEFAULT_BC_BINS = 10;
 
 constexpr uint32_t DEFAULT_NUM_FOLDS = 10;
 
+///
+/// \brief Default percentage of training data with different guesses for archive
+///
+
+constexpr uint32_t DEFAULT_MIN_DISTANCE_PERCENTAGE = 1;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__

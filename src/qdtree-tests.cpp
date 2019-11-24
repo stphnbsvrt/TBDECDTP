@@ -4,12 +4,13 @@
 
 namespace qdt {
 
-static float testDiversity(std::vector<std::shared_ptr<qdt::DecisionTree>> trees, po::variables_map args) {
+static float testDiversity(std::vector<std::shared_ptr<qdt::DecisionTree>> trees, const std::vector<const DataElem*>& training_data, po::variables_map args) {
 
     uint32_t bc_bins = DEFAULT_BC_BINS;
     if (0 != args.count("bc_bins")) {
         bc_bins = args.at("bc_bins").as<uint32_t>();
     }
+    (void)bc_bins;
 
     // Expensive! Justified by being a test rather than part of the algorithm. 
     float total = 0;
@@ -17,7 +18,11 @@ static float testDiversity(std::vector<std::shared_ptr<qdt::DecisionTree>> trees
     for (auto tree1 : trees) {
         for (auto tree2 : trees) {
             if (tree1 != tree2) {
-                total += tree1->getBehavioralCharacteristic(bc_bins)->compare(tree2->getBehavioralCharacteristic(bc_bins));
+                for (auto data : training_data) {
+                    if (tree1->predict(data->features) != tree2->predict(data->features)) {
+                        total += 1;
+                    }
+                }
                 divisor += 1;
             }
         }
@@ -75,8 +80,10 @@ static float testBaggingEnsemble(const std::vector<const DataElem*>& training_da
         }
         trees.push_back(qdt::DecisionTree::greedyTrain(bagging_data[i], pruning_factor));
     }
-    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
-    return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
+    auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble accuracy = " << retval << std::endl;
+    return retval;
 }
 
 void testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
@@ -145,8 +152,10 @@ static float testCompleteRandomEnsemble(const std::vector<const DataElem*>& trai
     }
 
     // Test the ensemble
-    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
-    return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
+    auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble accuracy = " << retval << std::endl;
+    return retval;
 }
 
 void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
@@ -236,8 +245,10 @@ static float testGeneticEnsemble(const std::vector<const DataElem*>& training_da
     }
 
     // Test the ensemble
-    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
-    return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
+    auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble accuracy = " << retval << std::endl;
+    return retval;
 }
 
 void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
@@ -284,14 +295,28 @@ static float testQD(const std::vector<const DataElem*>& training_data, const std
         bc_bins = args.at("bc_bins").as<uint32_t>();
     }
 
-    std::vector<std::shared_ptr<qdt::DecisionTree>> trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins);
+    uint32_t min_distance_percentage = DEFAULT_MIN_DISTANCE_PERCENTAGE;
+    if (0 != args.count("min_distance_percentage")) {
+        min_distance_percentage = args.at("min_distance_percentage").as<uint32_t>();
+    }
+
+    std::vector<std::shared_ptr<qdt::DecisionTree>> trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins, min_distance_percentage);
+
+    // Retry with larger percentage if returned 0
+    while (trees.size() == 0) {
+        min_distance_percentage += 1;
+        std::cout << "retrying with min_distance_percentage " << min_distance_percentage << std::endl;
+        trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins, min_distance_percentage);    
+    }
     for (auto tree : trees) {
         tree->prune(training_data, pruning_factor);
     }
 
     // Test the ensemble
-    std::cout << "ensemble diversity = " << testDiversity(trees, args) << std::endl;
-    return qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
+    auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
+    std::cout << "ensemble accuracy = " << retval << std::endl;
+    return retval;
 }
 
 void testQD(const std::vector<DataSet>& data, po::variables_map args) {

@@ -31,24 +31,25 @@ int main(int argc, char** argv) {
     srand(time(NULL));
     std::vector<qdt::DataSet> data_sets = qdt::createDataSets(data, args);
 
+
     // Test greedy single tree
-    qdt::testGreedyHeuristic(data_sets, args);
+    //qdt::testGreedyHeuristic(data_sets, args);
 
     // Test bagging greedy ensemble 
     qdt::testBaggingEnsemble(data_sets, args);
 
     // Test complete random tree
-    qdt::testCompleteRandomSingle(data_sets, args);
+    //qdt::testCompleteRandomSingle(data_sets, args);
 
     // Test complete random ensemble
     qdt::testCompleteRandomEnsemble(data_sets, args);
 
     // Test genetic programming tree
-    qdt::testGeneticSingle(data_sets, args);
+    //qdt::testGeneticSingle(data_sets, args);
 
     // Test genetic programming ensemble
-    qdt::testGeneticEnsemble(data_sets, args);
-  
+    //qdt::testGeneticEnsemble(data_sets, args);
+
     // Test QD algorithm returning single tree
     qdt::testQD(data_sets, args);
 }
