@@ -210,7 +210,7 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<co
     }
 
     // If a best group is size 0, we're unseparable
-    if ((best_left_group->size() < min_samples) || (best_right_group->size() < min_samples)) {
+    if (((best_left_group->size() < min_samples) || (best_right_group->size() < min_samples))) {
         return tree_node;
     }
 
@@ -220,7 +220,7 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::greedyTrain(const std::vector<co
     return tree_node;
 }
 
-std::shared_ptr<DecisionTreeNode> DecisionTree::generateRandomTree(uint32_t height, const std::vector<std::string>& features, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number) {
+std::shared_ptr<DecisionTreeNode> DecisionTree::generateRandomTree(uint32_t height, const std::vector<std::string>& features, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number, std::shared_ptr<const std::vector<const DataElem*>> training_data) {
 
     // Make a new decision tree node
     auto tree_node = std::make_shared<DecisionTreeNode>();
@@ -233,18 +233,88 @@ std::shared_ptr<DecisionTreeNode> DecisionTree::generateRandomTree(uint32_t heig
         tree_node->decision->feature = features[rand() % features.size()];
 
         if (DataSet::discrete_features.find(tree_node->decision->feature) == DataSet::discrete_features.end()) {
-            tree_node->decision->threshold = 0.01 * (rand() % 100);
+            
+            if ((training_data == nullptr) || (training_data->size() == 0)) {
+                tree_node->decision->threshold = 0.01 * (rand() % 100);
+            }
+            else {
+                uint32_t idx1 = rand() % training_data->size();
+                uint32_t idx2 = rand() % training_data->size();
+                std::string feature = tree_node->decision->feature;
+                float val1 = training_data->at(idx1)->features.at(feature).first;
+                float val2 = training_data->at(idx2)->features.at(feature).first;
+                tree_node->decision->threshold = (val1 + val2) / 2;
+            }
+
         }
         else {
-            auto& choices = DataSet::discrete_features[tree_node->decision->feature];
-            auto iterator = choices.begin();
-            std::advance(iterator, (rand() % choices.size()));
-            tree_node->decision->threshold = *iterator;
+            if ((training_data == nullptr) || (training_data->size() == 0)) {
+                auto& choices = DataSet::discrete_features[tree_node->decision->feature];
+                auto iterator = choices.begin();
+                std::advance(iterator, (rand() % choices.size()));
+                tree_node->decision->threshold = *iterator;
+            }
+            else {
+                uint32_t idx1 = rand() % training_data->size();
+                uint32_t idx2 = rand() % training_data->size();
+                std::string feature = tree_node->decision->feature;
+                float val1 = training_data->at(idx1)->features.at(feature).first;
+                float val2 = training_data->at(idx2)->features.at(feature).first;
+                if ((rand() % 2) == 0) {
+                    tree_node->decision->threshold = val1;
+                }
+                else {
+                    tree_node->decision->threshold = val2;
+                }
+            }
         }
+        
+        // Check threshold values if feature is real valued
+        if ((training_data != nullptr) && (training_data->size() != 0)) {
+            if (DataSet::discrete_features.find(tree_node->decision->feature) == DataSet::discrete_features.end()) {
 
-        // Fill child nodes
-        tree_node->l_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 1);
-        tree_node->r_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 2);   
+                float split = tree_node->decision->threshold;
+                auto left_group = std::make_shared<std::vector<const DataElem*>>();
+                auto right_group = std::make_shared<std::vector<const DataElem*>>();
+                for (auto elem : *training_data) {
+                    if (elem->features.at(tree_node->decision->feature).first < split) {
+                        left_group->push_back(elem);
+                    }
+                    else {
+                        right_group->push_back(elem);
+                    }
+                }
+
+                // Fill child nodes
+                tree_node->l_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 1, left_group);
+                tree_node->r_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 2, right_group);   
+            }
+            else {
+
+                float split = tree_node->decision->threshold;
+                auto left_group = std::make_shared<std::vector<const DataElem*>>();
+                auto right_group = std::make_shared<std::vector<const DataElem*>>();
+                for (auto elem : *training_data) {
+                    if (elem->features.at(tree_node->decision->feature).first == split) {
+                        left_group->push_back(elem);
+                    }
+                    else {
+                        right_group->push_back(elem);
+                    }
+                }
+
+                // Fill child nodes
+                tree_node->l_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 1, left_group);
+                tree_node->r_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 2, right_group);   
+            }
+
+        }
+        else {
+
+            // Fill child nodes
+            tree_node->l_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 1);
+            tree_node->r_child = generateRandomTree(height - 1, features, tree_node, (2 * tree_node->node_number) + 2);   
+        }
     }
     return tree_node;
 
@@ -348,7 +418,8 @@ std::shared_ptr<DecisionTree> DecisionTree::randomTrain(const std::vector<const 
     }
 
     // Randomly generate the tree
-    tree->root_ = generateRandomTree(height, features, nullptr, 0);
+    auto training_ptr = std::make_shared<const std::vector<const DataElem*>>(training_data);
+    tree->root_ = generateRandomTree(height, features, nullptr, 0, training_ptr);
 
     // Label the nodes according to data
     tree->prune(training_data, pruning_factor);
@@ -413,16 +484,35 @@ static void mutateNode(std::shared_ptr<DecisionTreeNode> node, std::vector<std::
 
     if ((rand() % 100) < decision_chance) {
         node->decision->feature = features[rand() % features.size()];
-    }
-    if (DataSet::discrete_features.find(node->decision->feature) == DataSet::discrete_features.end()) {
-        node->decision->threshold += threshold_delta(generator);
-    }
-    else {
-        if ((rand() % 100) < decision_chance) {
+        if (DataSet::discrete_features.find(node->decision->feature) == DataSet::discrete_features.end()) {
+            node->decision->threshold = 0.01 * (rand() % 100);
+        }
+        else {
             auto& choices = DataSet::discrete_features[node->decision->feature];
             auto iterator = choices.begin();
             std::advance(iterator, (rand() % choices.size()));
             node->decision->threshold = *iterator;
+        }
+    }
+    else {
+        if (DataSet::discrete_features.find(node->decision->feature) == DataSet::discrete_features.end()) {
+            node->decision->threshold += threshold_delta(generator);
+            /*
+            if (node->decision->threshold < 0) {
+                node->decision->threshold = 0;
+            }
+            if (node->decision->threshold > 1) {
+                node->decision->threshold = 1;
+            }
+            */
+        }
+        else {
+            if ((rand() % 100) < decision_chance) {
+                auto& choices = DataSet::discrete_features[node->decision->feature];
+                auto iterator = choices.begin();
+                std::advance(iterator, (rand() % choices.size()));
+                node->decision->threshold = *iterator;
+            }
         }
     }
 
@@ -432,6 +522,7 @@ static void mutateNode(std::shared_ptr<DecisionTreeNode> node, std::vector<std::
 void DecisionTree::mutate(std::vector<std::string>& features) {
 
     float decision_chance = getHeight() * 0.5;
+    //float decision_chance = 10;
     std::default_random_engine generator;
     std::normal_distribution<double> threshold_delta(0, 0.1);
 
@@ -592,13 +683,14 @@ float DecisionTree::testEnsembleAccuracy(const std::vector<std::shared_ptr<Decis
     for (auto elem : testing_data) {
 
         // Create votes
-        // FIXME: use sum rule
         std::unordered_map<float, float> votes;
         for (auto tree : ensemble) {
+            
             auto confidence = tree->predictConfidence(elem->features);
             for (auto entry : confidence) {
                 votes[entry.first] += entry.second;
             }
+            
         }
 
         // Pick winner
@@ -684,7 +776,8 @@ void DecisionTree::addBcContribution(const std::shared_ptr<DecisionTreeNode>& no
 }
 
 std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vector<const DataElem*>& training_data, uint32_t height, 
-                                                                 uint32_t population_size, uint32_t forest_size, uint32_t num_generations, uint32_t num_bc_bins, uint32_t min_distance_percentage) {
+                                                                 uint32_t population_size, uint32_t forest_size, uint32_t num_generations, 
+                                                                 uint32_t num_bc_bins, uint32_t min_distance_percentage, qdt::SelectionStrategy selection) {
 
     (void)population_size;
     (void)num_bc_bins;
@@ -694,8 +787,8 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
     std::vector<float> container_accuracy;
     std::vector<float> selector;
     std::vector<std::vector<float>> container_predictions;
-    constexpr uint32_t INIT_TRIALS = 2000;
-    constexpr uint32_t MAX_INIT = 200;
+    constexpr uint32_t INIT_TRIALS = 3000;
+    constexpr uint32_t MAX_INIT = 350;
     float selector_total = 0;
     float MIN_DISTANCE = min_distance_percentage * (training_data.size() / 100.0);
 
@@ -703,15 +796,16 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
     for (uint32_t trial = 0; trial < INIT_TRIALS; trial++) {
 
         if (container.size() > MAX_INIT) {
-            std::cout << "random is too easy " << std::endl;
+            //std::cout << "random is too easy " << std::endl;
             return std::vector<std::shared_ptr<DecisionTree>>();
         }
+
         if (container.size() < 2) {
             container.push_back(randomTrain(training_data, height, 0));
             container_predictions.push_back(std::vector<float>(training_data.size(), -1));
-            auto copy = container.back()->copy();
-            copy->prune(training_data, 10);
-            container_accuracy.push_back(copy->testAccuracy(training_data, false, &(container_predictions[container_predictions.size() - 1])));
+            //auto copy = container.back()->copy();
+            //copy->prune(training_data, 1);
+            container_accuracy.push_back(container.back()->testAccuracy(training_data, false, &(container_predictions[container_predictions.size() - 1])));
             selector.push_back(1);
             selector_total += 1;
         }
@@ -721,9 +815,9 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
             float closest_distance = std::numeric_limits<float>::max();
             uint32_t closest_index = std::numeric_limits<uint32_t>::max();
             float second_closest_distance = std::numeric_limits<float>::max();
-            auto copy = new_tree->copy();
-            copy->prune(training_data, 10);
-            float new_accuracy = copy->testAccuracy(training_data, false, &new_predictions);
+            //auto copy = new_tree->copy();
+            //copy->prune(training_data, 1);
+            float new_accuracy = new_tree->testAccuracy(training_data, false, &new_predictions);
 
             for (uint32_t i = 0; i < container.size(); i++) {
                 float distance = 0;
@@ -732,7 +826,7 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
                     // TODO: handle regression
                     bool equal = new_predictions[j] == container_predictions[i][j];
                     if (!equal) {
-                        distance += 1;
+                       distance += 1;
                     }
                 }         
 
@@ -768,11 +862,13 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
     }   
 
     // Repeat for generations
-    std::cout << "evolution progress: 0%" << std::endl << std::endl;
+    //std::cout << "evolution progress: 0%" << std::endl << std::endl;
+    uint32_t init_size = container.size();
+    uint32_t num_replacements = 0;
     for (uint32_t i = 0; i < num_generations; i++) {
 
         if(selector_total > (container.size() * 2)) {
-            std::cout << "select is to high " << std::endl;
+            //std::cout << "select is to high " << std::endl;
             return std::vector<std::shared_ptr<DecisionTree>>();
         }
         /*
@@ -781,8 +877,8 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
         }
         */
         if (i % 10 == 1) {
-            std::cout << "\x1b[A\x1b[A" << "evolution progress: " << (((float)i)/num_generations) * 100 << "%" << std::endl; 
-            std::cout << "container size is " << container.size() << " selector total is " << selector_total << std::endl;
+         //   std::cout << "\x1b[A\x1b[A" << "evolution progress: " << (((float)i)/num_generations) * 100 << "%" << std::endl; 
+         //   std::cout << "container size is " << container.size() << " selector total is " << selector_total << std::endl;
         }
         
         float rand_selector = (rand() % (uint32_t)(2 * selector_total)) / 2.0;
@@ -808,17 +904,26 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
         // Generate children
         constexpr uint32_t NUM_OFFSPRING = 2;
         std::vector<std::shared_ptr<DecisionTree>> offspring;
+
+        
+        
         for (uint32_t j = 0; j < NUM_OFFSPRING; j += 2) {
             crossover(parent1, parent2, training_data, offspring);
         }
-
+        
+ /*
+        for (uint32_t j = 0; j < NUM_OFFSPRING; j += 2) {
+            offspring.push_back(randomTrain(training_data, height, 1));
+            offspring.push_back(randomTrain(training_data, height, 1));
+        }
+*/
         // Add children to archive if they're more fit than current representative
         for (auto child : offspring) {
 
             auto new_predictions = std::vector<float>(training_data.size(), -1);
-            auto copy = child->copy();
-            copy->prune(training_data, 10);
-            float new_accuracy = copy->testAccuracy(training_data, false, &new_predictions);
+            //auto copy = child->copy();
+            //copy->prune(training_data, 1);
+            float new_accuracy = child->testAccuracy(training_data, false, &new_predictions);
             float closest_distance = std::numeric_limits<float>::max();
             uint32_t closest_index = std::numeric_limits<uint32_t>::max();
             float second_closest_distance = std::numeric_limits<float>::max();
@@ -827,10 +932,11 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
                 float distance = 0;
                 for (uint32_t k = 0; k < training_data.size(); k++) {
                     
+                    
                     // TODO: handle regression
                     bool equal = new_predictions[k] == container_predictions[j][k];
                     if (!equal) {
-                        distance += 1;
+                       distance += 1;
                     }
                 }          
 
@@ -841,22 +947,6 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
                 }
                 else if(distance < second_closest_distance) {
                     second_closest_distance = distance;
-                }
-            }
-
-            float closests_closest_distance = std::numeric_limits<float>::max();
-            for (uint32_t j = 0; j < container.size(); j++) {
-                float distance = 0;
-                for (uint32_t k = 0; k < training_data.size(); k++) {
-                    
-                    // TODO: handle regression
-                    bool equal = container_predictions[closest_index][k] == container_predictions[j][k];
-                    if (!equal) {
-                        distance += 1;
-                    }
-                }          
-                if ((distance < closests_closest_distance) && (j != closest_index)) {
-                    closests_closest_distance = distance;
                 }
             }
 
@@ -889,6 +979,10 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
                     selector[parent1_index] += 1;
                     selector[parent2_index] += 1;         
                     selector_total += (2 + (1 - old_selector_val));
+
+                    if (closest_index < init_size) {
+                        num_replacements++;
+                    }
                     //std::cout << "hello" << std::endl;
 
             }
@@ -908,20 +1002,54 @@ std::vector<std::shared_ptr<DecisionTree>> DecisionTree::QDTrain(const std::vect
         }
     }
 
-    // Return the best representatives in the forest
+    // Return an ensemble
     std::vector<std::shared_ptr<DecisionTree>> return_vector;
     if (forest_size > container.size()) {
         throw std::runtime_error("couldn't fill forest");
     }
-    std::vector<bool> taken(container.size(), false);
-    while (return_vector.size() < forest_size) {
 
-       uint32_t new_idx = rand() % container.size();
-       while (taken[new_idx] == true) {
-           new_idx = (new_idx + 1) % container.size();
+    uint32_t num_greedy = 0;
+    uint32_t num_random = 0;
+    switch(selection) {
+        case SelectionStrategy::ACCURATE:
+            num_greedy = forest_size;
+            break;
+        case SelectionStrategy::DIVERSE:
+            num_random = forest_size;
+            break;
+        case SelectionStrategy::HYBRID:
+            num_greedy = forest_size / 2;
+            num_random = forest_size - num_greedy;
+            break;
+    }
+
+    std::vector<bool> taken(container.size(), false);
+    while (return_vector.size() < num_random) {
+
+        
+        uint32_t new_idx = rand() % container.size();
+        while (taken[new_idx] == true) {
+            new_idx = (new_idx + 1) % container.size();
+        }
+        return_vector.push_back(container[new_idx]);
+        taken[new_idx] = true;
+
+    }
+    while (return_vector.size() < num_random + num_greedy) {
+                
+       float best_fitness = std::numeric_limits<float>::min();
+       uint32_t best_idx = 0;
+       for (uint32_t i = 0; i < container.size(); i++) {
+           if (taken[i] == false) {
+               float fitness = container[i]->testAccuracy(training_data, false, nullptr);
+               if (fitness > best_fitness) {
+                   best_fitness = fitness;
+                   best_idx = i;
+               }
+           }
        }
-       return_vector.push_back(container[new_idx]);
-       taken[new_idx] = true;
+       taken[best_idx] = true;
+       return_vector.push_back(container[best_idx]);
 
     }
     return return_vector;

@@ -18,6 +18,10 @@ po::variables_map parseCommandline(int argc, char** argv) {
         ("pruning_factor", po::value<float>(), "Percentage of the training sample required for all nodes in final trees")
         ("min_distance_percentage", po::value<uint32_t>(), "Percentage of training data which must be different between items in archive")
         ("num_folds", po::value<uint32_t>(), "Number of folds to use for cross validation")
+        ("selection_strategy", po::value<uint32_t>(), "Selection strategy enumeration, 0=random, 1=greedy, 2=hybrid")
+        ("test_type", po::value<uint32_t>(), "Type of ensemble test to run. 0=bagging, 1=random, 2=QD")
+        ("iterations", po::value<uint32_t>(), "Number of instances of each algorithm to run")
+        ("csv_out", po::value<std::string>(), "Name of file to output csv data")
     ;
 
     po::variables_map vm;
@@ -134,7 +138,7 @@ std::vector<DataSet> createDataSets(const std::vector<DataElem>& data, po::varia
     std::vector<DataSet> data_sets = std::vector<DataSet>(num_folds, DataSet());
     for (uint32_t i = 0; i < data_sets.size(); i++) {
         for (uint32_t j = 0; j < data_folds.size(); j++) {
-            if (j == i) {
+            if (j != i) {
                 data_sets[i].training_data.insert(data_sets[i].training_data.begin(), data_folds[j].begin(), data_folds[j].end());
             }
             else {

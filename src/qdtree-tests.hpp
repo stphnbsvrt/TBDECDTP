@@ -18,8 +18,11 @@ void testGreedyHeuristic(const std::vector<DataSet>& data, po::variables_map arg
 ///
 /// \brief Test the accuracy of the bagging-constructed forest with provided args on the data
 ///
+///
+/// \return Average accuracy, diversity pair
+///
 
-void testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args);
+std::pair<float, float> testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args);
 
 ///
 /// \brief Test the accuracy of a single complete-random tree with provided args on the data
@@ -30,8 +33,11 @@ void testCompleteRandomSingle(const std::vector<DataSet>& data, po::variables_ma
 ///
 /// \brief Test the accuracy of an ensemble of complete-random trees with provided args on the data
 ///
+///
+/// \return Average accuracy, diversity pair
+///
 
-void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args);
+std::pair<float, float> testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args);
 
 ///
 /// \brief Test the accuracy of a single tree genetic programming tree with provided args on the data
@@ -48,8 +54,10 @@ void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map arg
 ///
 /// \brief Test the accuracy of a decision tree formulated from a QD algorithm
 ///
+/// \return Average accuracy, diversity pair
+///
 
-void testQD(const std::vector<DataSet>& data, po::variables_map args);
+std::pair<float, float> testQD(const std::vector<DataSet>& data, po::variables_map args);
 
 }
 

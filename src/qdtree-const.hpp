@@ -13,6 +13,26 @@
 
 namespace qdt {
 
+///
+/// \brief Enumeration of strategies for choosing trees to add to ensemble
+///
+
+enum class SelectionStrategy : uint32_t {
+    DIVERSE = 0,
+    ACCURATE,
+    HYBRID
+};
+
+///
+/// \brief Enumeration of test types
+///
+
+enum class TestType : uint32_t {
+    BAGGING = 0,
+    RANDOM,
+    QD
+};
+
 /// 
 /// \brief Represents a data point
 ///
@@ -350,7 +370,7 @@ public:
     ///
 
     static std::vector<std::shared_ptr<DecisionTree>> QDTrain(const std::vector<const DataElem*>& training_data, uint32_t height, uint32_t population_size, uint32_t forest_size, 
-                                                              uint32_t num_generations, uint32_t num_bc_bins, uint32_t min_distance_percentage);
+                                                              uint32_t num_generations, uint32_t num_bc_bins, uint32_t min_distance_percentage, SelectionStrategy selection);
 
     ///
     /// \brief Test the accuracy of the tree on a set of data
@@ -424,7 +444,7 @@ protected:
     /// \brief Generates a complete binary tree of a given height using random decisions at each node
     ///
 
-    static std::shared_ptr<DecisionTreeNode> generateRandomTree(uint32_t height, const std::vector<std::string>& features, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number);
+    static std::shared_ptr<DecisionTreeNode> generateRandomTree(uint32_t height, const std::vector<std::string>& features, std::shared_ptr<DecisionTreeNode> parent, uint64_t node_number, std::shared_ptr<const std::vector<const DataElem*>> training_data=nullptr);
 
     ///
     /// \brief Fill the labels of the nodes in the tree according to the given data

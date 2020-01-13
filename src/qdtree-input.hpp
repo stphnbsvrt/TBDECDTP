@@ -83,6 +83,12 @@ constexpr uint32_t DEFAULT_NUM_FOLDS = 10;
 
 constexpr uint32_t DEFAULT_MIN_DISTANCE_PERCENTAGE = 1;
 
+///
+/// \brief Default selection strategy for QD algorithm
+///
+
+constexpr SelectionStrategy DEFAULT_SELECTION_STRATEGY = SelectionStrategy::HYBRID;
+
 } // namespace qdt
 
 #endif // __QDTREE_INPUT_HPP__

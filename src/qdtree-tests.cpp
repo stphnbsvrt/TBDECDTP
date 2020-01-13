@@ -19,8 +19,13 @@ static float testDiversity(std::vector<std::shared_ptr<qdt::DecisionTree>> trees
         for (auto tree2 : trees) {
             if (tree1 != tree2) {
                 for (auto data : training_data) {
-                    if (tree1->predict(data->features) != tree2->predict(data->features)) {
-                        total += 1;
+                    auto predict1 = tree1->predict(data->features);
+                    auto predict2 = tree2->predict(data->features);
+                                        
+                    // TODO: handle regression
+                    bool equal = predict1 == predict2;
+                    if (!equal) {
+                       total += 1;
                     }
                 }
                 divisor += 1;
@@ -58,7 +63,8 @@ void testGreedyHeuristic(const std::vector<DataSet>& data, po::variables_map arg
     std::cout << "Got greedy accuracy: " << total/data.size() << std::endl;
 }
 
-static float testBaggingEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+// returns accuracy, diversity pair
+static std::pair<float, float> testBaggingEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
 
     uint32_t forest_size = DEFAULT_FOREST_SIZE;
     if (0 != args.count("forest_size")) {
@@ -80,20 +86,24 @@ static float testBaggingEnsemble(const std::vector<const DataElem*>& training_da
         }
         trees.push_back(qdt::DecisionTree::greedyTrain(bagging_data[i], pruning_factor));
     }
-    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
+
     auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
-    std::cout << "ensemble accuracy = " << retval << std::endl;
-    return retval;
+    return {retval, testDiversity(trees, testing_data, args)};
 }
 
-void testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
+std::pair<float, float> testBaggingEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
     
     std::cout << std::endl << "------Bagging ensemble test----------" << std::endl;
-    float total = 0;
+    std::cout << "diversity,accuracy" << std::endl;
+    float total_accuracy = 0;
+    float total_diversity = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
-        total += testBaggingEnsemble(data[i].training_data, data[i].testing_data, args);
+        auto stats = testBaggingEnsemble(data[i].training_data, data[i].testing_data, args);
+        total_accuracy += stats.first;
+        total_diversity += stats.second;
     }
-    std::cout << "Got bagging accuracy: " << total/data.size() << std::endl;
+    std::cout << "Got cross validation bagging accuracy: " << total_accuracy/data.size() << ", diveristy " << total_diversity/data.size() << std::endl;
+    return {total_accuracy/data.size(), total_diversity/data.size()};
 }
  
 static float testCompleteRandomSingle(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
@@ -128,7 +138,8 @@ void testCompleteRandomSingle(const std::vector<DataSet>& data, po::variables_ma
     std::cout << "Got random single accuracy: " << total/data.size() << std::endl;
 }
 
-static float testCompleteRandomEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+// returns accuracy, diversity pair
+static std::pair<float, float> testCompleteRandomEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
 
     // Create random trees
     uint32_t forest_size = DEFAULT_FOREST_SIZE;
@@ -152,20 +163,23 @@ static float testCompleteRandomEnsemble(const std::vector<const DataElem*>& trai
     }
 
     // Test the ensemble
-    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
     auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
-    std::cout << "ensemble accuracy = " << retval << std::endl;
-    return retval;
+    return {retval, testDiversity(trees, testing_data, args)};
 }
 
-void testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
+std::pair<float, float> testCompleteRandomEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
 
     std::cout << std::endl << "------Complete random ensemble test----------" << std::endl;
-    float total = 0;
+    std::cout << "diversity,accuracy" << std::endl;
+    float total_accuracy = 0;
+    float total_diversity = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
-        total += testCompleteRandomEnsemble(data[i].training_data, data[i].testing_data, args);
+        auto stats = testCompleteRandomEnsemble(data[i].training_data, data[i].testing_data, args);
+        total_accuracy += stats.first;
+        total_diversity += stats.second;
     }
-    std::cout << "Got random ensemble accuracy: " << total/data.size() << std::endl;
+    std::cout << "Got cross validation random ensemble accuracy: " << total_accuracy/data.size() <<  ", diversity = " << total_diversity/data.size() << std::endl;
+    return {total_accuracy/data.size(), total_diversity/data.size()};
 }
  
 static float testGeneticSingle(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
@@ -211,7 +225,8 @@ void testGeneticSingle(const std::vector<DataSet>& data, po::variables_map args)
     std::cout << "Got genetic single accuracy: " << total/data.size() << std::endl;
 }
 
-static float testGeneticEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+// returns accuracy, diversity pair
+static std::pair<float, float> testGeneticEnsemble(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
 
     // Create random trees
     uint32_t forest_size = DEFAULT_FOREST_SIZE;
@@ -245,24 +260,25 @@ static float testGeneticEnsemble(const std::vector<const DataElem*>& training_da
     }
 
     // Test the ensemble
-    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
     auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
-    std::cout << "ensemble accuracy = " << retval << std::endl;
-    return retval;
+    return {retval, testDiversity(trees, testing_data, args)};
 }
 
 void testGeneticEnsemble(const std::vector<DataSet>& data, po::variables_map args) {
 
     std::cout << std::endl << "------Genetic restart ensemble tree test----------" << std::endl;
-    float total = 0;
+    float total_accuracy = 0;
+    float total_diversity = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
-        total += testGeneticEnsemble(data[i].training_data, data[i].testing_data, args);
+        auto stats = testGeneticEnsemble(data[i].training_data, data[i].testing_data, args);
+        total_accuracy += stats.first;
+        total_diversity += stats.second;
     }
-    std::cout << "Got genetic ensemble accuracy: " << total/data.size() << std::endl;
-
+    std::cout << "Got genetic ensemble accuracy: " << total_accuracy/data.size() << ", diversity = " << total_diversity/data.size() << std::endl;
 }
 
-static float testQD(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
+// returns accuracy, diversity pair
+static std::pair<float, float> testQD(const std::vector<const DataElem*>& training_data, const std::vector<const DataElem*>& testing_data, po::variables_map args) {
 
     // Create random trees
     uint32_t forest_size = DEFAULT_FOREST_SIZE;
@@ -300,34 +316,41 @@ static float testQD(const std::vector<const DataElem*>& training_data, const std
         min_distance_percentage = args.at("min_distance_percentage").as<uint32_t>();
     }
 
-    std::vector<std::shared_ptr<qdt::DecisionTree>> trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins, min_distance_percentage);
+    SelectionStrategy selection = DEFAULT_SELECTION_STRATEGY;
+    if (0 != args.count("selection_strategy")) {
+        selection = (SelectionStrategy)args.at("selection_strategy").as<uint32_t>();
+    }
+
+    std::vector<std::shared_ptr<qdt::DecisionTree>> trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins, min_distance_percentage, selection);
 
     // Retry with larger percentage if returned 0
     while (trees.size() == 0) {
         min_distance_percentage += 1;
         std::cout << "retrying with min_distance_percentage " << min_distance_percentage << std::endl;
-        trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins, min_distance_percentage);    
+        trees = qdt::DecisionTree::QDTrain(training_data, tree_height, population_size, forest_size, num_generations, bc_bins, min_distance_percentage, selection);    
     }
     for (auto tree : trees) {
         tree->prune(training_data, pruning_factor);
     }
 
     // Test the ensemble
-    std::cout << "ensemble diversity = " << testDiversity(trees, testing_data, args) << std::endl;
     auto retval = qdt::DecisionTree::testEnsembleAccuracy(trees, testing_data, false);
-    std::cout << "ensemble accuracy = " << retval << std::endl;
-    return retval;
+    return {retval, testDiversity(trees, testing_data, args)};
 }
 
-void testQD(const std::vector<DataSet>& data, po::variables_map args) {
+std::pair<float, float> testQD(const std::vector<DataSet>& data, po::variables_map args) {
  
     std::cout << std::endl << "------QD algorithm test----------" << std::endl;
-    float total = 0;
+    std::cout << "diversity,accuracy" << std::endl;
+    float total_accuracy = 0;
+    float total_diversity = 0;
     for (uint32_t i = 0; i < data.size(); i++) {
-        total += testQD(data[i].training_data, data[i].testing_data, args);
+        auto stats = testQD(data[i].training_data, data[i].testing_data, args);
+        total_accuracy += stats.first;
+        total_diversity += stats.second;
     }
-    std::cout << "Got QD algorithm accuracy: " << total/data.size() << std::endl;
-
+    std::cout << "Got QD cross validation accuracy: " << total_accuracy/data.size() << ", diversity = " << total_diversity/data.size() << std::endl;
+    return {total_accuracy/data.size(), total_diversity/data.size()};
 }
 
 }
